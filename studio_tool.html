@@ -301,7 +301,9 @@ function buildCSV() {
 document.getElementById("csvBtn").onclick = () => {
   if (!studios.length) return;
   const blob = new Blob([buildCSV()], { type: "text/csv;charset=utf-8;" });
-  downloadBlob(blob, `スタジオ候補_${studios.length}件.csv`);
+  const fname = studios.length === 1 && studios[0].name
+    ? `${studios[0].name}.csv` : `スタジオ候補_${studios.length}件.csv`;
+  downloadBlob(blob, fname);
   toast("CSV を保存しました");
 };
 
