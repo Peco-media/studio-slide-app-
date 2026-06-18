@@ -206,10 +206,13 @@ function parseBlock(block) {
   const fields = {};
   const lines = block.split(/\r?\n/);
   let curKey = null;
+  let heading = "";
   for (const line of lines) {
     const m = line.match(/^[・･]\s*([^：:]+)[：:]\s*(.*)$/);
     if (m) { curKey = m[1].trim(); fields[curKey] = m[2].trim(); }
     else if (curKey && line.trim()) { fields[curKey] += line.trim(); }
+    // フィールド開始前の最初の見出し行（「・名前：」形式でない場合）をスタジオ名候補として保持
+    else if (!curKey && !heading && line.trim()) { heading = line.trim().replace(/^[・･]\s*/, ""); }
   }
   const get = (aliases) => {
     for (const a of aliases) if (fields[a] !== undefined && fields[a] !== "") return fields[a];
@@ -217,6 +220,8 @@ function parseBlock(block) {
   };
   const d = {};
   for (const key in FIELD_ALIASES) d[key] = get(FIELD_ALIASES[key]);
+  // スタジオ名が空なら、先頭の見出し行を名前として採用
+  if (!d.name && heading) d.name = heading;
   return d;
 }
 
