@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>スタジオ資料メーカー</title>
+<title>スタジオ・キャスティング資料メーカー</title>
 <script>
 /* pptxgenjs 3.12.0 をインライン埋め込み（社内ネットワークのCDNブロック回避） */
 /* PptxGenJS 3.12.0 @ 2023-03-20T03:12:31.375Z */
@@ -110,6 +110,26 @@
     font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s;
   }
   .toast.show { opacity: 1; }
+  .modes { display: flex; gap: 8px; margin-bottom: 18px; }
+  .mode-btn {
+    font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+    background: #eef4f4; color: var(--ink-soft); border: 1px solid var(--line);
+    border-radius: 8px; padding: 9px 18px; transition: background .15s, color .15s;
+  }
+  .mode-btn.is-active { background: var(--teal); color: #fff; border-color: var(--teal); }
+
+  .inf { border: 1px solid var(--line); border-radius: 9px; padding: 12px 14px; margin-bottom: 10px; background: #fbfdfd; }
+  .inf.inf-dog { border-left: 4px solid #B85042; }
+  .inf.inf-cat { border-left: 4px solid #2A7F8E; }
+  .inf .name { font-weight: 700; color: var(--blue); font-size: 14px; margin-bottom: 6px; }
+  .inf .name a { color: var(--blue); text-decoration: underline; }
+  .inf .badge { background: #eef4f4; }
+  .inf.inf-dog .badge { background: #FDF1EE; color: #B85042; }
+  .inf.inf-cat .badge { background: #EAF5F6; color: #2A7F8E; }
+  .inf dl { display: grid; grid-template-columns: 84px 1fr; gap: 2px 10px; font-size: 12px; }
+  .inf dt { color: var(--ink-soft); }
+  .inf dd { color: var(--ink); word-break: break-word; }
+
   footer { margin-top: 26px; font-size: 11px; color: var(--ink-soft); text-align: center; }
 </style>
 </head>
@@ -117,14 +137,19 @@
 <div class="wrap">
   <header>
     <div class="eyebrow">PECO ／ 撮影スタジオ管理</div>
-    <h1>スタジオ資料メーカー</h1>
-    <p class="lead">スタジオ情報を貼り付けるだけで、提案スライド（PPTX）と Notion 取り込み用 CSV を作成します。</p>
+    <h1>スタジオ・キャスティング資料メーカー</h1>
+    <p class="lead" id="lead">スタジオ情報を貼り付けるだけで、提案スライド（PPTX）と Notion 取り込み用 CSV を作成します。</p>
   </header>
+
+  <div class="modes">
+    <button type="button" class="mode-btn is-active" data-mode="studio">スタジオ資料</button>
+    <button type="button" class="mode-btn" data-mode="casting">キャスティング提案</button>
+  </div>
 
   <div class="grid">
     <!-- INPUT -->
     <section class="card">
-      <h2><span class="step">1</span>スタジオ情報を貼り付け</h2>
+      <h2><span class="step">1</span><span id="inputTitle">スタジオ情報を貼り付け</span></h2>
       <textarea id="input" spellcheck="false" placeholder="・スタジオ名：〇〇スタジオ
 ・最寄り駅：〇〇駅（徒歩5分）
 ・住所：東京都〇〇区...
@@ -136,7 +161,7 @@
 ・ペット可とした証憑：...
 ・公式URL：https://..."></textarea>
       <button class="btn-sample" id="sampleBtn">サンプルを入力</button>
-      <p class="hint">複数スタジオを続けて貼り付けてもOK。各スタジオは <code>・スタジオ名：</code> から始めてください（空行区切り推奨）。</p>
+      <p class="hint" id="inputHint">複数スタジオを続けて貼り付けてもOK。各スタジオは <code>・スタジオ名：</code> から始めてください（空行区切り推奨）。</p>
       <div class="row">
         <button class="btn-primary" id="parseBtn">読み取る</button>
         <button class="btn-ghost" id="clearBtn">クリア</button>
@@ -219,6 +244,8 @@ function guessArea(address) {
 }
 
 let studios = [];
+let influencers = [];
+let appMode = "studio";
 
 function fillOrMissing(v) { return v && v.trim() ? v : '<span class="miss">（未確認）</span>'; }
 
@@ -253,15 +280,31 @@ function render() {
 }
 
 document.getElementById("parseBtn").onclick = () => {
+  if (appMode === "casting") {
+    influencers = parseCasting(document.getElementById("input").value);
+    renderInfluencers();
+    if (influencers.length) toast(influencers.length + " 件を読み取りました");
+    else toast("読み取れませんでした。CSV/JSONの形式を確認してください");
+    return;
+  }
   studios = parseAll(document.getElementById("input").value);
   render();
   if (studios.length) toast(studios.length + " 件を読み取りました");
 };
 document.getElementById("clearBtn").onclick = () => {
   document.getElementById("input").value = "";
-  studios = []; render();
+  studios = []; influencers = [];
+  if (appMode === "casting") renderInfluencers(); else render();
 };
 document.getElementById("sampleBtn").onclick = () => {
+  if (appMode === "casting") {
+    document.getElementById("input").value =
+`account,url,followers,breed,names,category,area,age
+azchpn,https://www.instagram.com/azchpn/,843000,チワワ,パンナ,犬,東京都,5
+suihanki.dog,https://www.instagram.com/suihanki.dog/,763000,柴犬,すいか,犬,大阪府,3
+mike_neko,https://www.instagram.com/mike_neko/,98000,スコティッシュフォールド,みけ,猫,東京都,4`;
+    return;
+  }
   document.getElementById("input").value =
 `・スタジオ名：サモスタ 中野店
 ・最寄り駅：JR中央線・総武線「中野駅」 徒歩7分
@@ -397,6 +440,18 @@ function buildPPTX() {
 }
 
 document.getElementById("pptxBtn").onclick = async () => {
+  if (appMode === "casting") {
+    if (!influencers.length) return;
+    toast("スライドを生成中…");
+    try {
+      const pptx = buildCastingDeck(influencers);
+      const d = new Date();
+      const fn = `casting_proposal_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}.pptx`;
+      await pptx.writeFile({ fileName: fn });
+      toast("スライドを保存しました");
+    } catch (e) { console.error(e); toast("生成に失敗しました（コンソール参照）"); }
+    return;
+  }
   if (!studios.length) return;
   toast("スライドを生成中…");
   try {
@@ -410,6 +465,199 @@ document.getElementById("pptxBtn").onclick = async () => {
     toast("生成に失敗しました（コンソール参照）");
   }
 };
+
+/* ===================== キャスティング提案モード ===================== */
+function csvToRows(text) {
+  const rows = []; let row = []; let cur = ""; let inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQ) {
+      if (ch === '"') { if (text[i+1] === '"') { cur += '"'; i++; } else inQ = false; }
+      else cur += ch;
+    } else {
+      if (ch === '"') inQ = true;
+      else if (ch === ',') { row.push(cur); cur = ""; }
+      else if (ch === '\n') { row.push(cur); rows.push(row); row = []; cur = ""; }
+      else if (ch === '\r') { /* skip */ }
+      else cur += ch;
+    }
+  }
+  if (cur !== "" || row.length) { row.push(cur); rows.push(row); }
+  return rows;
+}
+function normInf(o) {
+  return {
+    account: (o.account || o.handle || o.name || "").toString().trim(),
+    url: (o.url || o.instagram || "").toString().trim(),
+    followers: Number(String(o.followers == null ? "" : o.followers).replace(/[^0-9.]/g, "")) || 0,
+    breed: (o.breed || "").toString().trim(),
+    names: (o.names || o.petName || "").toString().trim(),
+    category: (o.category || o.species || "犬").toString().trim() === "猫" ? "猫" : "犬",
+    area: (o.area || "").toString().trim(),
+    age: (o.age == null ? "" : o.age).toString().trim()
+  };
+}
+function parseCasting(text) {
+  const t = (text || "").trim();
+  if (!t) return [];
+  if (t[0] === "[" || t[0] === "{") {
+    try {
+      const j = JSON.parse(t);
+      const arr = Array.isArray(j) ? j : [j];
+      return arr.map(normInf).filter(d => d.account || d.url);
+    } catch (e) { /* CSVとして処理 */ }
+  }
+  const rows = csvToRows(t);
+  if (rows.length < 2) return [];
+  const headers = rows[0].map(h => h.trim());
+  return rows.slice(1)
+    .filter(r => r.some(c => (c || "").trim() !== ""))
+    .map(r => { const o = {}; headers.forEach((h, i) => o[h] = r[i] != null ? r[i] : ""); return normInf(o); })
+    .filter(d => d.account || d.url);
+}
+function renderInfluencers() {
+  const pv = document.getElementById("preview");
+  const actions = document.getElementById("actions");
+  const count = document.getElementById("count");
+  if (!influencers.length) {
+    pv.innerHTML = '<p class="empty">読み取れる候補が見つかりませんでした。CSV/JSONの形式を確認してください。</p>';
+    actions.style.display = "none"; count.textContent = ""; return;
+  }
+  count.textContent = influencers.length + " 件";
+  pv.innerHTML = influencers.map(d => {
+    const isCat = d.category === "猫";
+    const fol = d.followers ? d.followers.toLocaleString() : '<span class="miss">（未確認）</span>';
+    const acc = d.url
+      ? `<a href="${d.url}" target="_blank" rel="noopener">${d.account || "（名称なし）"}</a>`
+      : (d.account || '<span class="miss">（名称なし）</span>');
+    return `<div class="inf inf-${isCat ? "cat" : "dog"}">
+      <div class="name">${acc} <span class="badge">${d.category}</span></div>
+      <dl>
+        <dt>${isCat ? "猫種" : "犬種"}</dt><dd>${d.breed || '<span class="miss">（未記入）</span>'}</dd>
+        <dt>フォロワー</dt><dd>${fol}</dd>
+        ${d.area ? `<dt>エリア</dt><dd>${d.area}</dd>` : ""}
+      </dl>
+    </div>`;
+  }).join("");
+  actions.style.display = "flex";
+}
+
+/* ---- 提案デッキ生成（添付デザイン準拠：カードヘッダー帯＋写真枠＋犬猫色分け＋種別ごとに自動ページ送り）---- */
+const CAST_PAL = {
+  ink:"222222", sub:"7A7A7A", white:"FFFFFF",
+  dog:{ hdr:"B85042", body:"FDEEEA", border:"D8A89F", accent:"B5402F" },
+  cat:{ hdr:"3E6FA0", body:"EAF1F8", border:"A8C2DD", accent:"3E6FA0" }
+};
+const CAST_CIRCLED = ["","①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩","⑪","⑫"];
+function castCircle(n) { return CAST_CIRCLED[n] || ("(" + n + ")"); }
+function castPal(sp) { return sp === "猫" ? CAST_PAL.cat : CAST_PAL.dog; }
+function castFmt(n) { n = Number(n) || 0; return n.toLocaleString("en-US"); }
+function castHandle(a) { a = (a || "").trim(); if (!a) return "（名称なし）"; return a[0] === "@" ? a : "@" + a; }
+
+function castTitleBar(pptx, slide, species, pageInSpecies) {
+  const c = castPal(species);
+  slide.background = { color: "FFFFFF" };
+  slide.addShape(pptx.ShapeType.rect, { x:0.45, y:0.34, w:0.1, h:0.44, fill:{color:c.hdr}, line:{color:c.hdr} });
+  const ord = castCircle(pageInSpecies) + " フォロワー数順" + (pageInSpecies > 1 ? "（続き）" : "");
+  slide.addText([
+    { text:`キャスティング候補（${species}）`, options:{ bold:true, color:CAST_PAL.ink, fontSize:20 } },
+    { text:"　　" + ord, options:{ bold:false, color:CAST_PAL.sub, fontSize:13 } }
+  ], { x:0.66, y:0.28, w:12, h:0.55, valign:"middle", fontFace:"Meiryo", margin:0 });
+  slide.addText("© 2026  Peco", { x:0.45, y:7.12, w:4, h:0.3, fontSize:9, color:CAST_PAL.sub, valign:"middle", fontFace:"Meiryo", margin:0 });
+  slide.addText("※ ご発注後より裏取りを実施致します。　F ＝ フォロワー数", { x:5, y:7.12, w:7.85, h:0.3, fontSize:9, color:CAST_PAL.sub, align:"right", valign:"middle", fontFace:"Meiryo", margin:0 });
+}
+
+function castCard(pptx, slide, inf, x, y, w, h) {
+  const sp = inf.category === "猫" ? "猫" : "犬";
+  const c = castPal(sp);
+  slide.addShape(pptx.ShapeType.roundRect, { x, y, w, h, rectRadius:0.07, fill:{color:c.body}, line:{color:c.border, width:1.25} });
+  slide.addShape(pptx.ShapeType.rect, { x:x+0.06, y:y+0.06, w:w-0.12, h:0.34, fill:{color:c.hdr}, line:{color:c.hdr} });
+  slide.addText(`★ キャスティ PR 候補（${sp}）`, { x:x+0.06, y:y+0.06, w:w-0.12, h:0.34, fontSize:9, bold:true, color:CAST_PAL.white, align:"center", valign:"middle", fontFace:"Meiryo", margin:0 });
+  const pw = Math.min(1.75, w-0.7), ph = 1.28, px = x+(w-pw)/2, py = y+0.5;
+  slide.addShape(pptx.ShapeType.rect, { x:px, y:py, w:pw, h:ph, fill:{color:"F2F2F2"}, line:{color:"D9D9D9", width:1} });
+  slide.addText("写真", { x:px, y:py, w:pw, h:ph, fontSize:11, color:"B0B0B0", align:"center", valign:"middle", fontFace:"Meiryo", margin:0 });
+  const tx = x+0.22, tw = w-0.4;
+  const ho = { x:tx, y:y+1.88, w:tw, h:0.3, fontSize:13, bold:true, underline:true, color:CAST_PAL.ink, valign:"middle", fontFace:"Meiryo", margin:0 };
+  if (inf.url) ho.hyperlink = { url: inf.url, tooltip: inf.account };
+  slide.addText(castHandle(inf.account), ho);
+  slide.addText(inf.breed || "", { x:tx, y:y+2.18, w:tw, h:0.22, fontSize:9.5, color:CAST_PAL.sub, valign:"middle", fontFace:"Meiryo", margin:0 });
+  slide.addText(inf.names || "", { x:tx, y:y+2.38, w:tw, h:0.22, fontSize:9.5, color:CAST_PAL.sub, valign:"middle", fontFace:"Meiryo", margin:0 });
+  slide.addText(`${castFmt(inf.followers)} F`, { x:tx, y:y+2.60, w:tw, h:0.3, fontSize:13, bold:true, color:c.accent, valign:"middle", fontFace:"Meiryo", margin:0 });
+}
+
+function castCover(pptx, dogN, catN, total) {
+  const s = pptx.addSlide();
+  s.background = { color: "FFFFFF" };
+  s.addShape(pptx.ShapeType.roundRect, { x:0.85, y:0.85, w:2.7, h:0.42, rectRadius:0.06, fill:{color:"FDEEEA"}, line:{color:"FDEEEA"} });
+  s.addText("候補リスト（裏取り前）", { x:0.85, y:0.85, w:2.7, h:0.42, fontSize:11, bold:true, color:"B85042", align:"center", valign:"middle", fontFace:"Meiryo", margin:0 });
+  s.addShape(pptx.ShapeType.rect, { x:0.62, y:2.05, w:0.12, h:1.5, fill:{color:"B85042"}, line:{color:"B85042"} });
+  s.addText("インフルエンサー\nキャスティング案", { x:0.95, y:2.0, w:11, h:1.65, fontSize:40, bold:true, color:"222222", lineSpacingMultiple:1.1, valign:"middle", fontFace:"Meiryo", margin:0 });
+  s.addText(`犬 ${dogN}名　／　猫 ${catN}名　　合計 ${total}名`, { x:0.97, y:3.95, w:11, h:0.4, fontSize:15, color:"B85042", fontFace:"Meiryo", valign:"middle", margin:0 });
+  s.addText("PECO Inc.　｜　Influencer Marketing Division", { x:0.97, y:4.5, w:11, h:0.35, fontSize:10, color:"888888", fontFace:"Meiryo", valign:"middle", margin:0 });
+}
+
+function buildCastingDeck(data) {
+  const pptx = new PptxGenJS();
+  pptx.layout = "LAYOUT_WIDE";
+  pptx.title = "インフルエンサー キャスティング案";
+
+  const byFol = (a, b) => (Number(b.followers)||0) - (Number(a.followers)||0);
+  const dogs = data.filter(d => d.category !== "猫").sort(byFol);
+  const cats = data.filter(d => d.category === "猫").sort(byFol);
+
+  castCover(pptx, dogs.length, cats.length, data.length);
+
+  const cols = 4, perPage = 8, marginX = 0.55, colGap = 0.3, rowGap = 0.2;
+  const cW = (13.333 - marginX*2 - colGap*(cols-1)) / cols;
+  const cH = 2.95, topY = 0.95;
+
+  function emitSpecies(list, species) {
+    const pages = Math.ceil(list.length / perPage);
+    for (let p = 0; p < pages; p++) {
+      const chunk = list.slice(p*perPage, (p+1)*perPage);
+      const s = pptx.addSlide();
+      castTitleBar(pptx, s, species, p+1);
+      chunk.forEach((inf, idx) => {
+        const r = Math.floor(idx/cols), col = idx%cols;
+        castCard(pptx, s, inf, marginX + col*(cW+colGap), topY + r*(cH+rowGap), cW, cH);
+      });
+    }
+  }
+  if (dogs.length) emitSpecies(dogs, "犬");
+  if (cats.length) emitSpecies(cats, "猫");
+  return pptx;
+}
+
+/* ---- モード切り替え ---- */
+function setMode(m) {
+  if (m === appMode) return;
+  appMode = m;
+  document.querySelectorAll(".mode-btn").forEach(b => b.classList.toggle("is-active", b.dataset.mode === m));
+  const input = document.getElementById("input");
+  studios = []; influencers = [];
+  input.value = "";
+  document.getElementById("preview").innerHTML = '<p class="empty">左に情報を貼り付けて「読み取る」を押すと、ここに内容が表示されます。</p>';
+  document.getElementById("actions").style.display = "none";
+  document.getElementById("count").textContent = "";
+  const pptxBtn = document.getElementById("pptxBtn");
+  const csvBtn = document.getElementById("csvBtn");
+  if (m === "casting") {
+    document.getElementById("inputTitle").textContent = "キャスティングCSVを貼り付け";
+    input.placeholder = "キャスティングボードから書き出したCSVを貼り付け\n（1行目: account,url,followers,breed,names,category,area,age）";
+    document.getElementById("inputHint").innerHTML = 'キャスティングボードの「CSVで書き出し」または「JSONで書き出し」の中身をそのまま貼ってください。写真は出力後に各カードの枠へ手動で入れます。';
+    document.getElementById("lead").textContent = "キャスティングボードで書き出したCSVを貼り付けるだけで、犬・猫を色分けした提案スライド（PPTX）を作成します。";
+    pptxBtn.textContent = "提案スライド（PPTX）を保存";
+    csvBtn.style.display = "none";
+  } else {
+    document.getElementById("inputTitle").textContent = "スタジオ情報を貼り付け";
+    input.placeholder = "・スタジオ名：〇〇スタジオ\n・最寄り駅：〇〇駅（徒歩5分）\n・住所：東京都〇〇区...\n・広さ：50㎡\n・キッチンの有無：あり\n・控室の有無：あり\n・1時間あたりの料金：5,000円〜7,000円\n・ペット利用時の注意点：...\n・ペット可とした証憑：...\n・公式URL：https://...";
+    document.getElementById("inputHint").innerHTML = '複数スタジオを続けて貼り付けてもOK。各スタジオは <code>・スタジオ名：</code> から始めてください（空行区切り推奨）。';
+    document.getElementById("lead").textContent = "スタジオ情報を貼り付けるだけで、提案スライド（PPTX）と Notion 取り込み用 CSV を作成します。";
+    pptxBtn.textContent = "スライド（PPTX）を保存";
+    csvBtn.style.display = "";
+  }
+}
+document.querySelectorAll(".mode-btn").forEach(b => { b.onclick = () => setMode(b.dataset.mode); });
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
