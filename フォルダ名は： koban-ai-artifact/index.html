@@ -1,0 +1,4163 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>koban-ai</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="module">
+import PptxGenJS from 'https://esm.sh/pptxgenjs@3.12.0';
+window.PptxGenJS = PptxGenJS;
+</script>
+<style>
+:root{
+  --g:#1D9E75;--gd:#0F6E56;--gl:#E1F5EE;--gm:#5DCAA5;
+  --b:#185FA5;--bl:#E6F1FB;
+  --su:#F6F5F1;--bd:#E8E6E1;--bd2:#D5D3CE;
+  --tx:#181816;--mt:#8E8D88;--wh:#FFFFFF;
+  --rs:8px;--sh:0 2px 8px rgba(0,0,0,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--su);color:var(--tx);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+/* ── Top bar ── */
+.topbar{height:50px;background:var(--g);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.topbar-logo{display:flex;align-items:center;gap:9px}
+.topbar-icon{width:28px;height:28px;background:rgba(255,255,255,.2);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px}
+.topbar-name{font-size:15px;font-weight:700;color:#fff;letter-spacing:.02em}
+.topbar-tag{font-size:10px;color:rgba(255,255,255,.65);font-family:'DM Mono',monospace;background:rgba(255,255,255,.15);padding:2px 8px;border-radius:9px}
+.spacer{flex:1}
+.topbar-hint{font-size:11px;color:rgba(255,255,255,.7);font-family:'DM Mono',monospace}
+
+.prog{height:3px;background:rgba(255,255,255,.3);flex-shrink:0}
+.prog-fill{height:100%;background:#fff;transition:width .5s ease;width:0%}
+
+/* ── Layout ── */
+.body{flex:1;display:flex;overflow:hidden}
+
+/* ── Sidebar ── */
+.sb{width:248px;flex-shrink:0;background:var(--wh);border-right:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden}
+.sb-steps{padding:14px 14px 0;display:flex;flex-direction:column;gap:3px}
+.sb-step{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:var(--rs);transition:background .15s}
+.sb-step.active{background:var(--gl)}
+.sb-num{width:21px;height:21px;border-radius:50%;background:var(--bd);color:var(--mt);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'DM Mono',monospace;transition:all .2s}
+.sb-step.done .sb-num,.sb-step.active .sb-num{background:var(--g);color:#fff}
+.sb-step.done .sb-num::after{content:'✓'}
+.sb-step.done .sb-num{font-size:11px}
+.sb-label{font-size:12px;font-weight:500;color:var(--mt);line-height:1.3}
+.sb-step.active .sb-label,.sb-step.done .sb-label{color:var(--tx)}
+.sb-sublabel{font-size:10px;color:var(--mt)}
+
+.sb-sum{flex:1;overflow-y:auto;padding:14px;border-top:1px solid var(--bd);margin-top:12px}
+.sb-sum-t{font-size:9.5px;font-weight:700;color:var(--mt);letter-spacing:.08em;text-transform:uppercase;font-family:'DM Mono',monospace;margin-bottom:10px}
+.sb-row{display:flex;gap:6px;padding:5px 0;border-bottom:1px solid var(--bd);font-size:11px}
+.sb-k{color:var(--mt);min-width:66px;flex-shrink:0}
+.sb-v{color:var(--tx);font-weight:500;word-break:break-all;line-height:1.4}
+.sb-empty{font-size:11px;color:var(--mt);text-align:center;padding:20px 0;line-height:1.8}
+
+.sb-gen{padding:14px;border-top:1px solid var(--bd);display:flex;flex-direction:column;gap:7px}
+.sb-gen-label{font-size:10px;color:var(--mt);font-weight:600;letter-spacing:.05em;margin-bottom:2px}
+.btn-gen{width:100%;padding:10px;border-radius:var(--rs);border:none;font-family:'Noto Sans JP',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn-gen.pri{background:var(--g);color:#fff}.btn-gen.pri:hover{background:var(--gd)}
+.btn-gen.sec{background:var(--su);color:var(--tx);border:1px solid var(--bd)}.btn-gen.sec:hover{background:var(--bd)}
+.btn-gen.ter{background:#1D4ED8;color:#fff}.btn-gen.ter:hover{background:#1E40AF}
+.btn-gen:disabled{opacity:.35;cursor:not-allowed}
+
+/* ── Chat ── */
+.chat-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.chat-area{flex:1;overflow-y:auto;padding:20px 28px;display:flex;flex-direction:column;gap:14px}
+
+.msg{display:flex;gap:10px;align-items:flex-start}
+.msg.u{flex-direction:row-reverse;align-self:flex-end;max-width:72%;justify-content:flex-start}
+.msg.ai{max-width:680px}
+.msg.wide{max-width:100%!important}
+.msg-av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;margin-top:1px}
+.ai .msg-av{background:var(--gl);color:var(--gd)}
+.u .msg-av{background:var(--bl);color:var(--b)}
+.msg-bub{padding:11px 15px;border-radius:16px;font-size:13.5px;line-height:1.65}
+.ai .msg-bub{background:var(--wh);border:1px solid var(--bd);border-top-left-radius:4px;box-shadow:var(--sh)}
+.u .msg-bub{background:var(--g);color:#fff;border-top-right-radius:4px}
+
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+.chip{padding:6px 14px;border:1.5px solid var(--bd);border-radius:20px;font-size:12.5px;font-family:'Noto Sans JP',sans-serif;background:var(--wh);color:var(--tx);cursor:pointer;transition:all .15s;font-weight:500}
+.chip:hover{border-color:var(--g);color:var(--g);background:var(--gl)}
+
+/* ── Conte guide ── */
+.conte-box{border:1.5px solid var(--g);border-radius:10px;padding:13px 15px;margin-top:10px;background:linear-gradient(135deg,var(--gl),#d4efe4)}
+.conte-box-t{font-weight:700;color:var(--gd);margin-bottom:7px;font-size:13px}
+.conte-box ol{padding-left:18px;line-height:2.1;color:var(--tx);font-size:13px}
+.paste-area{width:100%;margin-top:10px;padding:10px 12px;border:1.5px solid var(--bd);border-radius:var(--rs);font-size:12.5px;font-family:'Noto Sans JP',sans-serif;background:var(--wh);color:var(--tx);resize:vertical;min-height:80px;outline:none}
+.paste-area:focus{border-color:var(--g)}
+.paste-btn{margin-top:7px;padding:8px 18px;background:var(--g);color:#fff;border:none;border-radius:var(--rs);font-family:'Noto Sans JP',sans-serif;font-size:13px;font-weight:700;cursor:pointer}
+.paste-btn:hover{background:var(--gd)}
+
+/* ── Edit table ── */
+.edit-wrap{margin-top:11px;overflow-x:auto;border-radius:var(--rs);border:1px solid var(--bd)}
+.edit-tbl{border-collapse:collapse;font-size:12px;width:100%;min-width:600px}
+.edit-tbl th{background:var(--g);color:#fff;padding:7px 9px;text-align:left;font-size:11px;font-weight:600;white-space:nowrap;position:sticky;top:0}
+.edit-tbl td{padding:4px 6px;border-bottom:1px solid var(--bd);vertical-align:middle}
+.edit-tbl tr:last-child td{border-bottom:none}
+/* row colors */
+tr[data-rt="staff_in"] td{background:#EEF0FE}
+tr[data-rt="client_in"] td{background:#FEF0EE}
+tr[data-rt="model_in"] td{background:#EDF7F2}
+tr[data-rt="model_out"] td{background:#FFF5F5}
+tr[data-rt="set_change"] td{background:#FEFCE8}
+tr[data-rt="break"] td{background:#FFF3F3}
+tr[data-rt="shoot_start"] td{background:#E8F8F0}
+tr[data-rt="shoot_end"] td{background:#F0F0FF}
+tr[data-rt="wrap_up"] td{background:#F0F0FF}
+tr[data-rt="move"] td{background:#E8F0FE}
+tr[data-rt="cut"] td{background:#fff}
+tr[data-rt="cut"]:nth-child(even) td{background:#FAFAF8}
+.ci{width:100%;padding:4px 7px;border:1px solid var(--bd);border-radius:4px;font-size:11.5px;font-family:'Noto Sans JP',sans-serif;background:var(--wh);color:var(--tx);outline:none}
+.ci:focus{border-color:var(--g)}
+.ci-sel{padding:4px 5px;border:1px solid var(--bd);border-radius:4px;font-size:11px;font-family:'Noto Sans JP',sans-serif;background:var(--wh);color:var(--tx);outline:none;cursor:pointer}
+.ci-sel:focus{border-color:var(--g)}
+.del-btn{padding:3px 9px;background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5;border-radius:4px;font-size:10.5px;cursor:pointer;white-space:nowrap}
+.del-btn:hover{background:#FCA5A5}
+.drag-h{width:22px;text-align:center;cursor:grab;color:var(--mt);font-size:15px;user-select:none;padding:0!important}
+.drag-h:active{cursor:grabbing}
+tr.dragging{opacity:.35}
+tr.dov-top td{border-top:2.5px solid var(--g)!important}
+tr.dov-bot td{border-bottom:2.5px solid var(--g)!important}
+.rt-badge{font-size:10.5px;color:var(--mt);white-space:nowrap;font-weight:500}
+
+.add-btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.add-btn{padding:5px 11px;background:var(--su);color:var(--tx);border:1px solid var(--bd);border-radius:20px;font-size:11.5px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:all .15s;white-space:nowrap}
+.add-btn:hover{background:var(--bd)}
+.confirm-btn{margin-top:10px;padding:9px 20px;background:var(--g);color:#fff;border:none;border-radius:var(--rs);font-family:'Noto Sans JP',sans-serif;font-size:13px;font-weight:700;cursor:pointer}
+.confirm-btn:hover{background:var(--gd)}
+
+/* ── Input ── */
+.input-wrap{border-top:1px solid var(--bd);padding:13px 28px;background:var(--wh);display:flex;gap:8px;align-items:center;flex-shrink:0}
+.txt-in{flex:1;padding:10px 16px;border:1.5px solid var(--bd);border-radius:22px;font-size:13.5px;font-family:'Noto Sans JP',sans-serif;background:var(--su);color:var(--tx);outline:none;transition:border-color .15s}
+.txt-in:focus{border-color:var(--g);background:var(--wh)}
+.txt-in::placeholder{color:var(--mt)}
+.btn-send{width:38px;height:38px;border-radius:50%;background:var(--g);border:none;color:#fff;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s}
+.btn-send:hover{background:var(--gd)}
+
+/* ── Typing ── */
+.typing-dots{display:flex;gap:4px;align-items:center;padding:3px 2px}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--mt);animation:bnc 1.2s infinite}
+.dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
+@keyframes bnc{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:20px;right:20px;padding:10px 18px;background:var(--tx);color:#fff;border-radius:var(--rs);font-size:12.5px;font-weight:500;opacity:0;transform:translateY(6px);transition:all .25s;z-index:999;pointer-events:none}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.ok{background:var(--g)}.toast.err{background:#C62828}
+
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px}
+.msg-edit-btn{position:absolute;top:6px;right:6px;padding:2px 8px;background:var(--su);border:1px solid var(--bd);border-radius:8px;font-size:10px;color:var(--mt);cursor:pointer;opacity:0;transition:opacity .15s;font-family:'Noto Sans JP',sans-serif}
+.msg:hover .msg-edit-btn{opacity:1}
+.msg-edit-btn:hover{background:var(--gl);border-color:var(--g);color:var(--g)}
+.ai .msg-bub{position:relative}
+
+/* ── サイドバー編集パネル ── */
+.sb-panel{border-bottom:1px solid var(--bd);padding:10px 12px}
+.sb-panel-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.sb-panel-title{font-size:11px;font-weight:700;color:var(--mt);letter-spacing:.06em;text-transform:uppercase;font-family:'DM Mono',monospace}
+.sb-edit-btn{font-size:10px;padding:2px 8px;background:var(--su);border:1px solid var(--bd);border-radius:10px;cursor:pointer;color:var(--mt);font-family:'Noto Sans JP',sans-serif;transition:all .15s}
+.sb-edit-btn:hover{border-color:var(--g);color:var(--g)}
+.sb-field{display:flex;flex-direction:column;gap:2px;margin-bottom:7px}
+.sb-field-label{font-size:10px;color:var(--mt);font-weight:500}
+.sb-field-val{font-size:12px;color:var(--tx);font-weight:500;line-height:1.4}
+.sb-inp{width:100%;padding:4px 7px;border:1px solid var(--bd);border-radius:4px;font-size:11.5px;font-family:'Noto Sans JP',sans-serif;background:var(--wh);color:var(--tx);outline:none}
+.sb-inp:focus{border-color:var(--g)}
+.sb-sel{width:100%;padding:4px 6px;border:1px solid var(--bd);border-radius:4px;font-size:11.5px;font-family:'Noto Sans JP',sans-serif;background:var(--wh);color:var(--tx);outline:none;cursor:pointer}
+.sb-sel:focus{border-color:var(--g)}
+.sb-apply-btn{width:100%;margin-top:6px;padding:6px;background:var(--g);color:#fff;border:none;border-radius:4px;font-size:11.5px;font-family:'Noto Sans JP',sans-serif;font-weight:700;cursor:pointer}
+.sb-apply-btn:hover{background:var(--gd)}
+.sb-cast-row{display:flex;align-items:center;gap:5px;padding:4px 0;border-bottom:1px solid var(--bd);font-size:11.5px}
+.sb-cast-name{flex:1;font-weight:500}
+.sb-cast-time{color:var(--mt);font-size:10.5px}
+.sb-regen-btn{width:100%;padding:9px;background:#1D4ED8;color:#fff;border:none;border-radius:var(--rs);font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;margin-bottom:6px;display:flex;align-items:center;justify-content:center;gap:5px}
+.sb-regen-btn:hover{background:#1E40AF}
+</style>
+</head>
+<body>
+<div class="toast" id="toast"></div>
+
+<div class="topbar">
+  <div class="topbar-logo">
+    <div class="topbar-icon">🐾</div>
+    <div class="topbar-name">koban-ai</div>
+    <div class="topbar-tag">Claude powered</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="topbar-hint" id="topHint">会話を進めてください</div>
+</div>
+<div class="prog"><div class="prog-fill" id="progFill"></div></div>
+
+<div class="body">
+  <aside class="sb">
+    <div class="sb-steps" id="sbSteps">
+      <div class="sb-step active" data-s="0"><div class="sb-num">1</div><div class="sb-label">基本情報</div></div>
+      <div class="sb-step" data-s="1"><div class="sb-num">2</div><div class="sb-label">撮影種別</div></div>
+      <div class="sb-step" data-s="2"><div class="sb-num">3</div><div class="sb-label">キャスト情報</div></div>
+      <div class="sb-step" data-s="3"><div class="sb-num">4</div><div class="sb-label">スケジュール</div></div>
+      <div class="sb-step" data-s="4"><div class="sb-num">5</div><div class="sb-label">クライアント</div></div>
+      <div class="sb-step" data-s="5"><div class="sb-num">6</div><div class="sb-label">カット情報</div></div>
+      <div class="sb-step" data-s="6"><div class="sb-num">7</div><div class="sb-label">確認・編集・出力</div></div>
+    </div>
+    <!-- 対話中：サマリー表示 -->
+    <div class="sb-sum" id="sbSumArea">
+      <div class="sb-sum-t">入力サマリー</div>
+      <div id="sbRows"><div class="sb-empty">会話を進めると<br>ここに表示されます</div></div>
+    </div>
+    <!-- 完了後：編集パネル（初期非表示） -->
+    <div id="sbEditArea" style="flex:1;overflow-y:auto;display:none"></div>
+
+    <div class="sb-gen">
+      <button class="sb-regen-btn" id="btnRegen" onclick="regenSchedule()" style="display:none">🔄 スケジュール表を再生成</button>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button class="btn-gen sec" onclick="exportData()" style="flex:1;font-size:11px;padding:7px">💾 保存</button>
+        <label class="btn-gen sec" style="flex:1;font-size:11px;padding:7px;cursor:pointer;text-align:center">
+          📂 読み込む<input type="file" accept=".json" onchange="importData(event)" style="display:none">
+        </label>
+      </div>
+      <div class="sb-gen-label">出力形式を選択</div>
+      <button class="btn-gen pri" id="btnXlsx" onclick="genOutput('xlsx')" disabled>📊 Excel（.xlsx）</button>
+      <button class="btn-gen sec" id="btnPptL" onclick="genOutput('pptL')" disabled>⬜ PowerPoint 横向き</button>
+      <button class="btn-gen ter" id="btnPptP" onclick="genOutput('pptP')" disabled>📄 PowerPoint 縦向き</button>
+    </div>
+  </aside>
+
+  <div class="chat-wrap">
+    <div class="chat-area" id="chatArea"></div>
+    <div class="input-wrap">
+      <input class="txt-in" id="txtIn" placeholder="メッセージを入力..."/>
+      <button class="btn-send" onclick="onSend()">➤</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════════════════════════
+const S = {
+  title:'', dateplace:'', medium:'',
+  staffIn:'', shootStart:'', shootEnd:'', wrapUp:'', lunch:'',
+  client:'', clientTime:'',
+  casts: [],        // [{kind:'pet'|'human', name, inTime, outTime}]
+  castCount: 0, castIdx: 0,
+  scheduleRows: [], // 最終テーブルデータ
+  cutsData: [],     // カット行のみ
+};
+let pendingKey = null;
+let waitText = false;
+let activeStep = 0;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TIME HELPERS
+// ══════════════════════════════════════════════════════════════════════════════
+const TIME_OPTS = ['','7:00','7:15','7:30','7:45','8:00','8:15','8:30','8:45','9:00','9:15','9:30','9:45','10:00','10:15','10:30','10:45','11:00','11:15','11:30','11:45','12:00','12:15','12:30','12:45','13:00','13:15','13:30','13:45','14:00','14:15','14:30','14:45','15:00','15:15','15:30','15:45','16:00','16:15','16:30','16:45','17:00','17:15','17:30','17:45','18:00','18:15','18:30','18:45','19:00'];
+const mkTOpts = sel => {
+  // 完全一致しない場合は15分刻みに丸めて最近傍を探す
+  let matched = sel;
+  if (sel && !TIME_OPTS.includes(sel)) {
+    const t = parseTime(sel);
+    if (t != null) matched = minToStr(Math.round(t/15)*15);
+  }
+  return TIME_OPTS.map(t=>`<option value="${t}" ${t===matched?'selected':''}>${t||'—'}</option>`).join('');
+};
+
+function parseTime(str) {
+  if (!str) return null;
+  const m = str.match(/(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  return parseInt(m[1])*60 + parseInt(m[2]);
+}
+function minToStr(min) {
+  if (min == null) return '';
+  return `${Math.floor(min/60)}:${String(min%60).padStart(2,'0')}`;
+}
+function offsetTime(base, offsetMin) {
+  const t = parseTime(base);
+  if (t == null) return '';
+  return minToStr(t + offsetMin);
+}
+function extractTimes(str) {
+  const all = [...(str||'').matchAll(/(\d{1,2}:\d{2})/g)];
+  return { t1: all[0]?all[0][1]:'', t2: all[1]?all[1][1]:'' };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CHAT HELPERS
+// ══════════════════════════════════════════════════════════════════════════════
+function mkEl(tag,cls){const e=document.createElement(tag);if(cls)e.className=cls;return e;}
+function toast(msg,type=''){
+  const t=document.getElementById('toast');
+  t.textContent=(type==='ok'?'✅ ':type==='err'?'❌ ':'')+msg;
+  t.className='toast show'+(type?' '+type:'');
+  setTimeout(()=>t.className='toast',3000);
+}
+
+function addAI(txt, chips, key, ph) {
+  pendingKey = key;
+  waitText = !chips;
+  const inp = document.getElementById('txtIn');
+  inp.disabled = false;
+  inp.value = '';
+  inp.placeholder = ph || (chips ? '↑ 上の選択肢から選んでください' : 'メッセージを入力...');
+  const area = document.getElementById('chatArea');
+  const wrap = mkEl('div','msg ai');
+  wrap.dataset.key = key||'';  // どの質問かを記録
+  const av = mkEl('div','msg-av'); av.textContent='AI';
+  const bub = mkEl('div','msg-bub');
+  bub.innerHTML = txt.replace(/\n/g,'<br>');
+  if (chips) {
+    const cd = mkEl('div','chips');
+    chips.forEach(c=>{
+      const btn = mkEl('button','chip'); btn.textContent=c;
+      btn.onclick = ()=>handle(c, key);
+      cd.appendChild(btn);
+    });
+    bub.appendChild(cd);
+  }
+
+  // 修正ボタンはsetTimeoutで非同期に追加（addAI末尾で処理）
+
+  wrap.appendChild(av); wrap.appendChild(bub);
+  area.appendChild(wrap); area.scrollTop=area.scrollHeight;
+  updateUI();
+  setTimeout(()=>addEditBtnToPrev(null), 80);
+}
+
+// 全AIバブルに修正ボタンを追加（未設置のみ・スキップ対象を除く）
+const NON_EDITABLE_KEYS = ['regen','allDur','sortScenes','groupByLoc','groupPreview',
+  'lunchCutoff','moreOrProceed','indoorMove','outdoorMove','groupPreview','sceneDur',
+  'sceneList','sceneMore'];
+
+function addEditBtnToPrev(currentKey) {
+  const area = document.getElementById('chatArea');
+  [...area.querySelectorAll('.msg.ai[data-key]')].forEach(msgEl => {
+    const k = msgEl.dataset.key;
+    if (!k) return;
+    if (currentKey && k === currentKey) return;
+    if (NON_EDITABLE_KEYS.includes(k)) return; // フォーム系はスキップ
+    if (msgEl.querySelector('.msg-edit-btn')) return;
+
+    const btn = document.createElement('button');
+    btn.className = 'msg-edit-btn';
+    btn.textContent = '✏️ 修正する';
+    btn.onclick = () => goBackTo(k, msgEl);
+    msgEl.querySelector('.msg-bub')?.appendChild(btn);
+  });
+}
+
+// 指定のキーに戻って質問を再表示
+function goBackTo(key, msgEl) {
+  // その後に続くユーザーの返答バブルを取得して削除するかマーク
+  const area = document.getElementById('chatArea');
+  const allNodes = [...area.children];
+  const msgIdx = allNodes.indexOf(msgEl);
+
+  // msgEl以降のバブルを削除
+  allNodes.slice(msgIdx + 1).forEach(n => n.remove());
+
+  // S のうち該当キー以降をリセット
+  resetStateFrom(key);
+
+  // 該当の質問を再表示
+  addUser('（修正）');
+  typing(() => reaskKey(key));
+}
+
+// キーに対応する質問を再表示
+function reaskKey(key) {
+  switch(key) {
+    case 'title':      addAI('撮影タイトルを入力してください。',null,'title','例：ピュリナワン 新商品撮影'); break;
+    case 'dateplace':  addAI('撮影日・スタジオ名・最寄り駅を教えてください。',null,'dateplace','例：2026/06/10 / Studio Juni / 笹塚駅'); break;
+    case 'medium':     askMedium(); break;
+    case 'castCount':  askCastCount(); break;
+    case 'castKind':   askCastKind(S.castIdx||0); break;
+    case 'castName':   askCastName(S.castIdx||0); break;
+    case 'castIn':     askCastIn(S.castIdx||0); break;
+    case 'conteGuide': showConteGuide(); break;
+    case 'location':   askLocation(); break;
+    case 'moveInfo':   askMoveInfo(); break;
+    case 'shootStart': askShootStart(); break;
+    case 'client':     askClient(); break;
+    case 'clientTime': askClientTime(); break;
+    case 'lunch':      askLunch(); break;
+    case 'shootEnd':   askShootEnd(); break;
+    case 'wrapUp':     askWrapUp(); break;
+    case 'conte':      askConte(); break;
+    default:           toast('この質問は修正できません','err'); break;
+  }
+}
+
+// キー以降のStateをリセット
+function resetStateFrom(key) {
+  const order = ['title','dateplace','medium','castCount','castKind','castName','castIn',
+    'location','shootStart','client','clientTime','lunch','shootEnd','wrapUp','conte','moveInfo'];
+  const idx = order.indexOf(key);
+  if (idx < 0) return;
+  // そのキー以降をリセット
+  const resetKeys = order.slice(idx);
+  resetKeys.forEach(k => {
+    if (k === 'castCount') { S.castCount=0; S.castIdx=0; S.casts=[]; }
+    else if (k === 'client') { S.client=''; S.clientTime=''; }
+    else if (['castKind','castName','castIn'].includes(k)) { /* castは上でリセット */ }
+    else if (k==='moveInfo') { S.moves=[]; S.moveType=''; }
+    else { S[k]=''; }
+  });
+}
+function addUser(txt) {
+  const area = document.getElementById('chatArea');
+  const wrap = mkEl('div','msg u');
+  wrap.innerHTML = `<div class="msg-bub">${txt}</div>`;
+  area.appendChild(wrap); area.scrollTop=area.scrollHeight;
+}
+function typing(cb, delay=650) {
+  const area = document.getElementById('chatArea');
+  const wrap = mkEl('div','msg ai'); wrap.id='typing';
+  wrap.innerHTML = `<div class="msg-av">AI</div><div class="msg-bub"><div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div>`;
+  area.appendChild(wrap); area.scrollTop=area.scrollHeight;
+  setTimeout(()=>{ const t=document.getElementById('typing'); if(t)t.remove(); cb(); }, delay);
+}
+
+function onSend() {
+  const v = document.getElementById('txtIn').value.trim();
+  if (!v || !waitText) return;
+  document.getElementById('txtIn').value='';
+  handle(v, pendingKey);
+}
+document.getElementById('txtIn').addEventListener('keydown', e=>{ if(e.key==='Enter') onSend(); });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MAIN FLOW
+// ══════════════════════════════════════════════════════════════════════════════
+window.onload = () => {
+  typing(()=>showBriefForm());
+};
+
+
+function handle(val, key) {
+  if (key) S[key] = val;
+  addUser(val);
+  waitText = false;
+  const _inp = document.getElementById('txtIn');
+  _inp.disabled = false;
+  _inp.value = '';
+  _inp.placeholder = 'メッセージを入力...';
+  updateSummary();
+
+  // ── 分岐 ──────────────────────────────────────────────────────────────────
+  // 「その他」入力
+  if (['staffIn','shootStart','shootEnd','wrapUp','clientTime'].includes(key) && val==='その他（入力）') {
+    typing(()=>{ waitText=true; pendingKey=key; addAI('時間を入力してください。',null,key,'例：9:30'); }); return;
+  }
+
+  switch(key) {
+    case 'title':      typing(()=>askDateplace()); break;
+    case 'dateplace':  typing(()=>askMedium()); break;
+    case 'medium':     S.medium=''; typing(()=>askCastCount()); break;
+    case 'castCount':
+      S.castCount = parseInt(val)||1; S.castIdx=0; S.casts=[];
+      typing(()=>askCastKind(0)); break;
+    case 'castKind':
+      S._castKindTmp = val;
+      typing(()=>askCastName(S.castIdx)); break;
+    case 'castName':
+      S._castNameTmp = val;
+      typing(()=>askCastIn(S.castIdx)); break;
+    case 'castIn': break; // handled by button in askCastIn
+    case 'location':
+      typing(()=>askShootStart());
+      break;
+    case 'shootStart': typing(()=>askClient()); break;
+    case 'client':
+      if (val==='来場する') typing(()=>askClientTime());
+      else { S.clientTime=''; typing(()=>askLunch()); }
+      break;
+    case 'clientTime': typing(()=>askLunch()); break;
+    case 'lunch':      typing(()=>askShootEnd()); break;
+    case 'shootEnd':   typing(()=>askWrapUp()); break;
+    case 'wrapUp':     typing(()=>askConte()); break;
+    case 'conte':
+      if (val.includes('AIに')) typing(()=>showAIScheduleForm());
+      else if (val.includes('シーンを入力')) typing(()=>askSceneList());
+      else if (val.includes('アップロード')) typing(()=>showConteGuide());
+      else typing(()=>askCutsManual());
+      break;
+    case 'sceneList': break; // フォームボタンで処理
+    case 'sceneMore': break; // フォームボタンで処理
+    case 'cutsTotal':
+      S.cutsData = makeDummyCuts(val);
+      updateSummary();
+      typing(()=>showEditTable(), 300);
+      break;
+        default: typing(()=>showFinal()); break;
+  }
+}
+
+// ── 各質問 ──────────────────────────────────────────────────────────────────
+function askDateplace() {
+  activeStep=0;
+  addAI(`「${S.title}」ですね！\n\n撮影日・スタジオ名・最寄り駅を教えてください。`, null, 'dateplace', '例：2026/06/10（火）/ Studio Juni / 笹塚駅');
+}
+// ══════════════════════════════════════════════════════════════════════════════
+// 案件概要一括入力
+// ══════════════════════════════════════════════════════════════════════════════
+function showBriefForm() {
+  const area=document.getElementById('chatArea');
+  const wrap=mkEl('div','msg ai wide');
+  const av=mkEl('div','msg-av');av.textContent='AI';
+  const bub=mkEl('div','msg-bub');
+  bub.innerHTML='案件概要を入力してください。<br><span style="font-size:12px;color:var(--mt)">テキストをそのまま貼り付けでもOKです。AIが自動で読み取ります。</span>';
+
+  const ta=document.createElement('textarea');
+  ta.className='ci';
+  ta.placeholder='ピュリナワン 撮影 26/03/18 @Studio Juni\n出演者：猫A はるまきちゃん、猫B おーちゃん\n撮影時間：10時〜17時\nお昼休憩：1時間\nクライアント来訪：あり\n\nコンテ：\nC01：ねこAがくつろいでいるシーン　リビング\nC02：ねこAが遊んでいるシーン\n\n注意事項：猫Aと猫Bは一緒に撮影しない。前半猫A後半猫B。';
+  ta.style.cssText='width:100%;min-height:200px;padding:10px;font-size:12.5px;margin-top:10px;resize:vertical;line-height:1.7';
+  bub.appendChild(ta);
+
+  const genBtn=mkEl('button','confirm-btn');
+  genBtn.textContent='🤖 AIに読み取ってもらう';
+  genBtn.style.marginTop='10px';
+  genBtn.onclick=async()=>{
+    const text=ta.value.trim();
+    if(!text){toast('概要を入力してください','err');return;}
+    genBtn.disabled=true;
+    genBtn.textContent='⏳ 読み取り中...';
+    // ユーザーメッセージは表示しない（ボタンを押したことで明示的）
+    try { await parseBriefWithAI(text); }
+    catch(e){ toast('エラー: '+e.message,'err'); genBtn.disabled=false; genBtn.textContent='🤖 AIに読み取ってもらう'; }
+  };
+  bub.appendChild(genBtn);
+
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+  pendingKey='brief';waitText=false;
+  updateUI();
+}
+
+async function parseBriefWithAI(text) {
+  const prompt = `以下の撮影案件概要を解析してJSONで返してください。JSON以外は不要です。
+
+【概要】
+${text}
+
+形式：
+{"title":"","dateplace":"","shootStart":"10:00","shootEnd":"17:00","lunch":"60分","location":"スタジオ撮影","client":"来場する","clientTime":"09:30","staffIn":"09:00","wrapUp":"18:00","casts":[{"kind":"🐾 ペット（猫）","name":"","inTime":"","outTime":""}],"scenes":[{"num":"C01","content":"","location":"","cast":"","durationMin":45,"note":""}],"notes":""}
+
+ルール：
+- shootStart/shootEndはHH:MM形式
+- lunchは"45分"か"60分"か"なし"（お昼の区切りシーンは別途決めるので不要）
+- locationは「スタジオ撮影」「ロケ撮影」「スタジオ＋ロケ」のいずれか
+- clientTimeは撮影開始30分前を必ず設定する（client=来場する場合）。不明な場合も推定で入れること
+- castsのinTimeは撮影開始30分前を必ず設定する。不明な場合も推定で入れること
+- castsのoutTimeはそのキャストの最後の撮影シーン終了後30分程度を設定する。不明な場合はshootEndを設定
+- scenesは注意事項を守って撮影順に（キャストごとにまとめる等）
+- durationMin：猫が食べる=90、犬が食べる=60、くつろぐ=45、遊ぶ=45、商品=30`;
+
+  const res=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:3000,messages:[{role:'user',content:prompt}]})
+  });
+  const data=await res.json();
+  const raw=data.content?.[0]?.text||'';
+  const m=raw.match(/\{[\s\S]*\}/);
+  if(!m) throw new Error('解析できませんでした');
+  const r=JSON.parse(m[0]);
+
+  S.title      = r.title||'';
+  S.dateplace  = r.dateplace||'';
+  S.shootStart = r.shootStart||'';
+  S.shootEnd   = r.shootEnd||'';
+  S.lunch      = r.lunch||'60分';
+  S.lunchCutoff= ''; // タイムライン生成後に提案するためここでは設定しない
+  S.location   = r.location||'スタジオ撮影';
+  S.client     = r.client||'来場しない';
+  S.wrapUp     = r.wrapUp||offsetTime(S.shootEnd,60)||'';
+  S.staffIn    = r.staffIn||offsetTime(S.shootStart,-60)||'';
+
+  // クライアントIN：来場ありなら撮影開始30分前
+  const defaultClientIn = S.client.includes('来場する') ? offsetTime(S.shootStart,-30)||'' : '';
+  S.clientTime = (r.clientTime&&r.clientTime!=='') ? r.clientTime : defaultClientIn;
+
+  // キャストのIN/OUT：シーンのcastと照合してアウト時間を自動設定
+  const defaultCastIn  = offsetTime(S.shootStart,-30)||S.shootStart;
+  const defaultCastOut = S.shootEnd;
+
+  S.casts = (r.casts||[]).map(cast=>{
+    const name = cast.name||'';
+    // このキャストが最後に登場するシーンの終了時間を推定
+    const castScenes = (r.scenes||[]).filter(s=>(s.cast||'').includes(name));
+    // シーンのdurationMinを積み上げてアウト時間を算出
+    let outTime = (cast.outTime&&cast.outTime!=='') ? cast.outTime : defaultCastOut;
+    return {
+      kind:    cast.kind||'🐾 ペット（猫）',
+      name,
+      inTime:  (cast.inTime&&cast.inTime!=='') ? cast.inTime : defaultCastIn,
+      outTime,
+    };
+  });
+  S.castCount = S.casts.length;
+  S.scenes = (r.scenes||[]).map(s=>({
+    num:s.num||'C01', content:s.content||'',
+    location:s.location||'', cast:s.cast||'',
+    durationMin:s.durationMin||45, note:s.note||'',
+    type:'スチール', cam:'1カメ',
+  }));
+  S.aiNotes = r.notes||'';
+
+  // 強制フォールバック：clientTimeが空なら必ず設定
+  if (!S.clientTime || S.clientTime==='') {
+    S.clientTime = offsetTime(S.shootStart,-30)||S.shootStart;
+  }
+  // 強制フォールバック：castのinTimeが空なら必ず設定
+  const forcedCastIn2 = offsetTime(S.shootStart,-30)||S.shootStart;
+  S.casts.forEach(cast=>{
+    if (!cast.inTime||cast.inTime==='') {
+      cast.inTime = forcedCastIn2;
+    }
+  });
+
+  showBriefConfirm();
+}
+
+
+// ── 修正指示フォーム（チャット入力 + 例ボタン） ────────────────────────────
+function showBriefFixForm() {
+  const area=document.getElementById('chatArea');
+  const wrap=mkEl('div','msg ai wide');
+  const av=mkEl('div','msg-av');av.textContent='AI';
+  const bub=mkEl('div','msg-bub');
+
+  // 現在のSをサマリー表示
+  let html='どの部分を修正しますか？自由に指示してください。<br>';
+  html+=`<div style="background:var(--su);border-radius:8px;padding:10px 14px;font-size:12px;line-height:1.9;margin:10px 0">`;
+  html+=`<div style="font-weight:700;margin-bottom:4px">現在の内容</div>`;
+  if(S.title) html+=`<div>📋 ${S.title}</div>`;
+  if(S.shootStart) html+=`<div>⏰ 撮影時間：${S.shootStart}〜${S.shootEnd||'未定'}</div>`;
+  if(S.lunch) html+=`<div>🍱 昼休憩：${S.lunch}</div>`;
+  if(S.client) html+=`<div>🤝 クライアント：${S.client}</div>`;
+  if(S.casts.length) html+=`<div>🐾 キャスト：${S.casts.map(c=>c.name).join('、')}</div>`;
+  if(S.scenes.length){
+    html+=`<div style="margin-top:4px;border-top:1px solid var(--bd);padding-top:4px">撮影順（${S.scenes.length}シーン）：`;
+    html+=S.scenes.map(s=>`${s.num}`).join('→');
+    html+=`</div>`;
+  }
+  if(S.aiNotes) html+=`<div style="color:var(--mt);font-size:11px;margin-top:4px">📝 ${S.aiNotes}</div>`;
+  html+=`</div>`;
+  bub.innerHTML=html;
+
+  // よく使う修正例
+  const examples=[
+    'キャストBのインを13:00にして',
+    'おーちゃんの撮影が終わってからはるまきがイン',
+    'クライアントは来場しない',
+    'お昼休憩を1時間半にして',
+    'ダイニングのシーンは午後にまとめて',
+    'C03とC04の順番を入れ替えて',
+    '撮影終了を18時にして',
+  ];
+  const exWrap=mkEl('div','');
+  exWrap.style.cssText='display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px';
+  examples.forEach(ex=>{
+    const btn=mkEl('button','');
+    btn.textContent=ex;
+    btn.style.cssText='padding:4px 10px;background:var(--su);border:1px solid var(--bd);border-radius:12px;font-size:11px;cursor:pointer;color:var(--tx)';
+    btn.onclick=()=>{ ta.value=ta.value?(ta.value+'\n'+ex):ex; ta.focus(); };
+    exWrap.appendChild(btn);
+  });
+  bub.appendChild(exWrap);
+
+  const ta=document.createElement('textarea');
+  ta.className='ci';
+  ta.placeholder='例：キャストBのインを13時に変更して\n例：クライアントは来場しない方向で';
+  ta.style.cssText='width:100%;min-height:80px;padding:10px;font-size:12.5px;resize:vertical;line-height:1.7';
+  bub.appendChild(ta);
+
+  const genBtn=mkEl('button','confirm-btn');
+  genBtn.textContent='🤖 修正を反映する';
+  genBtn.style.marginTop='10px';
+  genBtn.onclick=async()=>{
+    const fixText=ta.value.trim();
+    if(!fixText){toast('修正指示を入力してください','err');return;}
+    genBtn.disabled=true;
+    genBtn.textContent='⏳ 修正中...';
+    addUser(fixText);
+    try { await parseBriefWithAIFix(fixText); }
+    catch(e){ toast('エラー: '+e.message,'err'); genBtn.disabled=false; genBtn.textContent='🤖 修正を反映する'; }
+  };
+  bub.appendChild(genBtn);
+
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+  pendingKey='briefFix';waitText=false;
+  updateUI();
+}
+
+// ── 修正指示を反映して再生成（全項目対応） ──────────────────────────────
+async function parseBriefWithAIFix(fixInstruction) {
+  // 現在のS全体をJSON文字列化してAIに渡す
+  const currentState = {
+    title: S.title,
+    dateplace: S.dateplace,
+    shootStart: S.shootStart,
+    shootEnd: S.shootEnd,
+    lunch: S.lunch,
+    location: S.location,
+    client: S.client,
+    clientTime: S.clientTime,
+    casts: S.casts.map(c=>({name:c.name,kind:c.kind,inTime:c.inTime,outTime:c.outTime})),
+    scenes: S.scenes.map(s=>({num:s.num,content:s.content,location:s.location,cast:s.cast,durationMin:s.durationMin,note:s.note})),
+    notes: S.aiNotes,
+  };
+
+  const prompt = `以下の撮影スケジュール情報に対して修正指示があります。指示を反映して修正後の情報をJSONで返してください。JSON以外は不要です。
+
+【現在の情報】
+${JSON.stringify(currentState, null, 2)}
+
+【修正指示】
+${fixInstruction}
+
+返答形式（修正した項目のみでなく全項目を返してください）：
+{
+  "title": "",
+  "dateplace": "",
+  "shootStart": "10:00",
+  "shootEnd": "17:00",
+  "lunch": "60分",
+  "location": "スタジオ撮影",
+  "client": "来場する",
+  "clientTime": "09:30",
+  "casts": [{"kind":"","name":"","inTime":"","outTime":""}],
+  "scenes": [{"num":"C01","content":"","location":"","cast":"","durationMin":45,"note":""}],
+  "notes": "修正内容の説明"
+}
+
+ルール：
+- 修正指示を最優先で守ること
+- 指示がない項目は現在の値をそのまま維持すること
+- scenesは撮影順に並べる
+- shootStart/shootEndはHH:MM形式`;
+
+  const res=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:3000,messages:[{role:'user',content:prompt}]})
+  });
+  const data=await res.json();
+  const raw=data.content?.[0]?.text||'';
+  const m=raw.match(/\{[\s\S]*\}/);
+  if(!m) throw new Error('解析できませんでした');
+  const r=JSON.parse(m[0]);
+
+  // 全項目をSに反映
+  if(r.title)      S.title      = r.title;
+  if(r.dateplace)  S.dateplace  = r.dateplace;
+  if(r.shootStart) S.shootStart = r.shootStart;
+  if(r.shootEnd)   S.shootEnd   = r.shootEnd;
+  if(r.lunch)      S.lunch      = r.lunch;
+  if(r.location)   S.location   = r.location;
+  if(r.client)     S.client     = r.client;
+  if(r.clientTime) S.clientTime = r.clientTime;
+  if(r.casts&&r.casts.length){
+    S.casts=r.casts.map(cast=>({
+      kind:cast.kind||'🐾 ペット（猫）',
+      name:cast.name||'',
+      inTime:cast.inTime||S.shootStart,
+      outTime:cast.outTime||S.shootEnd,
+    }));
+    S.castCount=S.casts.length;
+  }
+  if(r.scenes&&r.scenes.length){
+    S.scenes=r.scenes.map(s=>({
+      num:s.num||'C01',content:s.content||'',location:s.location||'',
+      cast:s.cast||'',durationMin:s.durationMin||45,note:s.note||'',
+      type:'スチール',cam:'1カメ',
+    }));
+  }
+  if(r.notes) S.aiNotes=(S.aiNotes?S.aiNotes+'\n':'')+'[修正] '+r.notes;
+
+  // 強制フォールバック
+  if(!S.clientTime) S.clientTime=offsetTime(S.shootStart,-30)||S.shootStart;
+  const forcedIn=offsetTime(S.shootStart,-30)||S.shootStart;
+  S.casts.forEach(cast=>{
+    if(!cast.inTime||cast.inTime==='') cast.inTime=forcedIn;
+    if(!cast.outTime||cast.outTime==='') cast.outTime=S.shootEnd||'';
+  });
+
+  showBriefConfirm();
+}
+
+
+// ── キャスト・クライアントIN/OUT確認フォーム ─────────────────────────────
+function askCastTimesConfirm() {
+  const area=document.getElementById('chatArea');
+  const wrap=mkEl('div','msg ai wide');
+  const av=mkEl('div','msg-av');av.textContent='AI';
+  const bub=mkEl('div','msg-bub');
+
+  const defaultIn = offsetTime(S.shootStart,-30)||S.shootStart||'';
+  const defaultOut = S.shootEnd||'';
+
+  bub.innerHTML=`キャストとクライアントの現場IN/OUT時間を確認してください。<br>
+<span style="font-size:12px;color:var(--mt)">撮影開始（${S.shootStart}）の30分前をデフォルトにしています</span>`;
+
+  const form=document.createElement('div');
+  form.style.cssText='display:flex;flex-direction:column;gap:10px;margin-top:12px';
+
+  const refs=[];
+
+  // クライアント
+  const clientComes = S.client&&(S.client.includes('来場')||S.client==='あり');
+  if(clientComes){
+    const row=document.createElement('div');
+    row.style.cssText='background:var(--su);border-radius:8px;padding:10px 12px';
+    row.innerHTML=`<div style="font-size:12px;font-weight:700;color:var(--tx);margin-bottom:8px">🤝 クライアント</div>`;
+    const inRow=document.createElement('div');
+    inRow.style.cssText='display:flex;gap:8px;align-items:center;font-size:12px';
+    inRow.innerHTML=`<span style="color:var(--mt);width:60px">IN時間</span>`;
+    const inSel=document.createElement('select');inSel.className='ci-sel';inSel.style.cssText='padding:5px 8px;font-size:12px';
+    const clientDefault = (S.clientTime&&S.clientTime!=='')?S.clientTime:defaultIn;
+    TIME_OPTS.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t||'—';if(t===clientDefault)o.selected=true;inSel.appendChild(o);});
+    inSel.value=clientDefault;
+    inRow.appendChild(inSel);row.appendChild(inRow);
+    form.appendChild(row);
+    refs.push({type:'client',inSel,outSel:null});
+  }
+
+  // キャスト
+  S.casts.forEach((cast,i)=>{
+    const row=document.createElement('div');
+    row.style.cssText='background:var(--su);border-radius:8px;padding:10px 12px';
+    row.innerHTML=`<div style="font-size:12px;font-weight:700;color:var(--tx);margin-bottom:8px">🐾 ${cast.name}</div>`;
+
+    const inRow=document.createElement('div');
+    inRow.style.cssText='display:flex;gap:8px;align-items:center;font-size:12px;margin-bottom:6px';
+    inRow.innerHTML=`<span style="color:var(--mt);width:60px">IN時間</span>`;
+    const inSel=document.createElement('select');inSel.className='ci-sel';inSel.style.cssText='padding:5px 8px;font-size:12px';
+    const castInDefault = (cast.inTime&&cast.inTime!=='')?cast.inTime:defaultIn;
+    TIME_OPTS.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t||'—';if(t===castInDefault)o.selected=true;inSel.appendChild(o);});
+    inSel.value=castInDefault;
+    inRow.appendChild(inSel);
+
+    const outRow=document.createElement('div');
+    outRow.style.cssText='display:flex;gap:8px;align-items:center;font-size:12px';
+    outRow.innerHTML=`<span style="color:var(--mt);width:60px">OUT時間</span>`;
+    const outSel=document.createElement('select');outSel.className='ci-sel';outSel.style.cssText='padding:5px 8px;font-size:12px';
+    const castOutDefault = (cast.outTime&&cast.outTime!=='')?cast.outTime:defaultOut;
+    TIME_OPTS.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t||'—';if(t===castOutDefault)o.selected=true;outSel.appendChild(o);});
+    outSel.value=castOutDefault;
+    outRow.appendChild(outSel);
+
+    row.appendChild(inRow);row.appendChild(outRow);
+    form.appendChild(row);
+    refs.push({type:'cast',idx:i,inSel,outSel});
+  });
+
+  bub.appendChild(form);
+
+  const confBtn=mkEl('button','confirm-btn');
+  confBtn.textContent='✅ この時間でスケジュールを生成する';
+  confBtn.style.marginTop='12px';
+  confBtn.onclick=()=>{
+    // S に反映
+    refs.forEach(ref=>{
+      if(ref.type==='client'){
+        S.clientTime=ref.inSel.value;
+      } else {
+        S.casts[ref.idx].inTime=ref.inSel.value;
+        S.casts[ref.idx].outTime=ref.outSel.value;
+      }
+    });
+    confBtn.disabled=true;
+    addUser('IN/OUT時間を確定');
+    // スケジュール生成へ
+    if(S.scenes&&S.scenes.length){
+      typing(()=>buildSceneSchedule());
+    } else {
+      typing(()=>askShootStart());
+    }
+  };
+  bub.appendChild(confBtn);
+
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+  pendingKey='castTimes';waitText=false;
+  document.getElementById('txtIn').disabled=true;
+  updateUI();
+}
+
+function showBriefConfirm() {
+  const area=document.getElementById('chatArea');
+  const wrap=mkEl('div','msg ai wide');
+  const av=mkEl('div','msg-av');av.textContent='AI';
+  const bub=mkEl('div','msg-bub');
+
+  let html='✅ 読み取り完了！内容を確認してください。<br>';
+  html+='<div style="background:var(--su);border-radius:8px;padding:10px 14px;font-size:12.5px;line-height:2;margin:10px 0">';
+  [['タイトル',S.title],['日時・場所',S.dateplace],['撮影開始〜終了',S.shootStart+'〜'+S.shootEnd],
+   ['昼休憩',S.lunch+(S.lunchCutoff&&S.lunchCutoff!=='all'&&S.lunchCutoff!=='none'?'（'+S.lunchCutoff+'まで午前）':S.lunchCutoff==='all'?'（全部午前）':S.lunchCutoff==='none'?'（午後スタート）':'')],
+   ['撮影場所',S.location],['クライアント',S.client+(S.clientTime?' IN '+S.clientTime:'')],
+   ['キャスト',S.casts.map(c=>c.name+'（IN '+c.inTime+' OUT '+c.outTime+'）').join('、')]
+  ].forEach(([l,v])=>{ if(v) html+=`<div><span style="color:var(--mt);min-width:90px;display:inline-block">${l}</span><strong>${v}</strong></div>`; });
+
+  if(S.scenes.length){
+    html+='<div style="margin-top:6px;border-top:1px solid var(--bd);padding-top:6px"><span style="color:var(--mt)">撮影順（'+S.scenes.length+'シーン）</span></div>';
+    S.scenes.forEach(s=>{
+      const t=s.durationMin,tStr=t<60?t+'分':t===60?'1時間':t%60===0?(t/60)+'時間':(Math.floor(t/60))+'時間'+(t%60)+'分';
+      html+=`<div><strong style="color:var(--g);min-width:36px;display:inline-block">${s.num}</strong><span style="color:var(--mt);font-size:11px;margin:0 4px">${s.location||''}</span><span style="color:var(--mt);font-size:11px;margin-right:4px">${s.cast||''}</span>${s.content}<span style="color:var(--mt);font-size:11px;margin-left:4px">(${tStr})</span></div>`;
+    });
+  }
+  if(S.aiNotes) html+=`<div style="margin-top:6px;border-top:1px solid var(--bd);padding-top:6px;color:var(--mt);font-size:12px">📝 ${S.aiNotes}</div>`;
+  html+='</div>';
+  bub.innerHTML=html;
+
+  const cd=mkEl('div','chips');
+  const okBtn=mkEl('button','chip');
+  okBtn.textContent='✅ この内容で進む';
+  okBtn.style.cssText='background:var(--g);color:#fff;border-color:var(--gd);font-weight:700';
+  okBtn.onclick=()=>{
+    addUser('この内容で進む');
+    activeStep=5;
+    // サイドバーを編集パネルに切り替え（この後いつでも個別修正できる）
+    document.getElementById('sbSumArea').style.display='none';
+    document.getElementById('sbEditArea').style.display='block';
+    renderEditPanels();
+    document.getElementById('btnRegen').style.display='flex';
+    document.getElementById('btnXlsx').disabled=false;
+    document.getElementById('btnPptL').disabled=false;
+    document.getElementById('btnPptP').disabled=false;
+    toast('左バナーでいつでも個別修正できます','ok');
+    if(S.scenes&&S.scenes.length){
+      S._fromBrief = true; // AI生成フロー識別フラグ
+      typing(()=>askAllDurations());
+    } else {
+      typing(()=>askShootStart());
+    }
+  };
+  // 修正指示ボタン
+  const fixBtn=mkEl('button','chip');
+  fixBtn.textContent='💬 修正指示を追加する';
+  fixBtn.style.cssText='background:#F0F8FF;color:var(--b);border-color:var(--bl);font-weight:600';
+  fixBtn.onclick=()=>{
+    addUser('修正指示を追加する');
+    typing(()=>showBriefFixForm());
+  };
+  const redoBtn=mkEl('button','chip');
+  redoBtn.textContent='✏️ 概要を書き直す';
+  redoBtn.onclick=()=>{ addUser('概要を書き直す'); typing(()=>showBriefForm()); };
+
+  cd.appendChild(okBtn);cd.appendChild(fixBtn);cd.appendChild(redoBtn);
+  bub.appendChild(cd);
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+  updateSummary();
+}
+
+function askMedium() {
+  // 撮影種別は不要のためスキップ
+  askCastCount();
+}
+function askCastCount() {
+  activeStep=2;
+  addAI('出演するキャストは合計何頭／名ですか？\n（ペット・人モデル両方含む）', ['1名','2名','3名','4名以上'], 'castCount');
+}
+function askCastKind(idx) {
+  activeStep=2;
+  document.getElementById('txtIn').disabled = false;
+  addAI(`${idx+1}人目のキャストは？`, ['🐾 ペット（猫）','🐾 ペット（犬）','🐾 ペット（その他）','👤 人モデル・飼い主'], 'castKind');
+}
+function askCastName(idx) {
+  activeStep=2;
+  const kind = S._castKindTmp||'';
+  const isHuman = kind.includes('人');
+  addAI(`名前を教えてください。`, null, 'castName', isHuman?'例：田中さん（飼い主）':'例：おーちゃん / ねこA おーちゃん');
+}
+function askCastIn(idx) {
+  activeStep=2;
+  const area = document.getElementById('chatArea');
+  const wrap = mkEl('div','msg ai');
+  const av = mkEl('div','msg-av'); av.textContent='AI';
+  const bub = mkEl('div','msg-bub');
+  bub.innerHTML = `<strong>${S._castNameTmp}</strong> のイン時間とアウト時間を選んでください。`;
+
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap';
+
+  // IDではなく変数で直接参照（複数回呼ばれてもIDが重複しない）
+  const mkSel = (label) => {
+    const w2 = document.createElement('div');
+    w2.style.cssText = 'display:flex;align-items:center;gap:5px';
+    const lbl = document.createElement('span');
+    lbl.style.cssText = 'font-size:12px;color:var(--mt)';
+    lbl.textContent = label;
+    const sel = document.createElement('select');
+    sel.className = 'ci-sel';
+    sel.style.cssText = 'padding:6px 8px;font-size:13px;border-radius:var(--rs)';
+    sel.innerHTML = mkTOpts('');
+    w2.appendChild(lbl); w2.appendChild(sel);
+    return { wrap:w2, sel };
+  };
+
+  const inObj  = mkSel('イン');
+  const outObj = mkSel('アウト');
+  const sep = document.createElement('span');
+  sep.textContent='〜'; sep.style.cssText='color:var(--mt);font-size:13px';
+
+  row.appendChild(inObj.wrap);
+  row.appendChild(sep);
+  row.appendChild(outObj.wrap);
+
+  const btn = document.createElement('button');
+  btn.className='chip'; btn.textContent='確定';
+  btn.style.cssText='margin-left:6px;padding:7px 18px;background:var(--g);color:#fff;border-color:var(--g)';
+  btn.onclick = () => {
+    // IDではなくクロージャ変数で取得
+    const inT  = inObj.sel.value  || '';
+    const outT = outObj.sel.value || '';
+    if (!inT) { toast('イン時間を選んでください','err'); return; }
+    const display = outT ? `${inT}〜${outT}` : inT;
+    // 確定ボタン無効化（二重押し防止）
+    btn.disabled = true;
+    S.casts.push({ kind:S._castKindTmp, name:S._castNameTmp, inTime:inT, outTime:outT });
+    S.castIdx++;
+    addUser(`${S._castNameTmp} イン:${display}`);
+    updateSummary();
+    if (S.castIdx < S.castCount) typing(()=>askCastKind(S.castIdx));
+    else typing(()=>askLocation());
+  };
+  row.appendChild(btn);
+  bub.appendChild(row);
+  wrap.appendChild(av); wrap.appendChild(bub);
+  area.appendChild(wrap); area.scrollTop=area.scrollHeight;
+
+  // テキスト入力は使わない
+  pendingKey = 'castIn'; waitText = false;
+  document.getElementById('txtIn').placeholder = '← 上のセレクトで選んで確定してください';
+  document.getElementById('txtIn').disabled = true;
+  updateUI();
+}
+function askLocation() {
+  activeStep=3;
+  document.getElementById('txtIn').disabled = false;
+  addAI('撮影場所を選んでください。', ['🏢 スタジオ撮影','🌿 ロケ撮影','🏢🌿 スタジオ＋ロケ'], 'location');
+}
+
+// ── ロケ移動情報 ────────────────────────────────────────────────────────────
+function askMoveInfo() {
+  activeStep=3;
+  const area=document.getElementById('chatArea');
+  const wrap=mkEl('div','msg ai wide');
+  wrap.dataset.key='moveInfo';  // 修正ボタン用にキーを設定
+  const av=mkEl('div','msg-av');av.textContent='AI';
+  const bub=mkEl('div','msg-bub');
+  bub.innerHTML='ロケ撮影ですね！🚗<br>移動のパターンを選んでください。';
+
+  const moveTypeChips=mkEl('div','chips');
+  [{label:'🏢 同じ施設内で場所が変わる', val:'indoor'},
+   {label:'🚗 別のロケ地に移動する', val:'outdoor'},
+   {label:'両方', val:'both'}].forEach(({label,val})=>{
+    const btn=mkEl('button','chip');btn.textContent=label;
+    btn.onclick=()=>{
+      S.moveType=val;
+      addUser(label);
+      if(val==='indoor'||val==='both'){
+        typing(()=>showIndoorMoveForm(val==='both'));
+      } else {
+        typing(()=>showOutdoorMoveForm());
+      }
+    };
+    moveTypeChips.appendChild(btn);
+  });
+  const noneBtn2=mkEl('button','chip');noneBtn2.textContent='移動なし';
+  noneBtn2.onclick=()=>{ addUser('移動なし'); S.moves=[]; S.moveType='none'; typing(()=>askLunchCutoff()); };
+  moveTypeChips.appendChild(noneBtn2);
+  bub.appendChild(moveTypeChips);
+
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+  pendingKey='moveInfo';waitText=false;
+  document.getElementById('txtIn').placeholder='← 上の選択肢をクリックしてください';
+  updateUI();
+}
+
+// ── 施設内移動：各シーンに撮影場所を設定 ──────────────────────────────────
+function showIndoorMoveForm(hasBothTypes) {
+  const area=document.getElementById('chatArea');
+  const wrap=mkEl('div','msg ai wide');
+  const av=mkEl('div','msg-av');av.textContent='AI';
+  const bub=mkEl('div','msg-bub');
+  bub.innerHTML='各シーンの撮影場所を入力してください。<br><span style="font-size:12px;color:var(--mt)">シーンが確定していない場合は後でスケジュール表で編集できます</span>';
+
+  // 現在のシーンリスト（あれば）
+  const sceneCount = S.scenes ? S.scenes.length : 5;
+  const hasScenesAlready = S.scenes && S.scenes.length > 0;
+
+  const tbl=document.createElement('table');
+  tbl.style.cssText='width:100%;border-collapse:collapse;margin-top:10px;font-size:12.5px';
+  tbl.innerHTML=`<thead><tr>
+    <th style="background:var(--g);color:#fff;padding:6px 10px;width:70px">No.</th>
+    <th style="background:var(--g);color:#fff;padding:6px 10px">内容</th>
+    <th style="background:var(--g);color:#fff;padding:6px 10px;width:200px">撮影場所</th>
+  </tr></thead>`;
+  const tbody=document.createElement('tbody');
+
+  if (hasScenesAlready) {
+    S.scenes.forEach((scene,i)=>{
+      const tr=document.createElement('tr');
+      tr.style.background=i%2===0?'#fff':'var(--su)';
+      const locInp=document.createElement('input');
+      locInp.className='ci';locInp.placeholder='例：フロント、客室、屋外ドッグラン';
+      locInp.value=scene.location||'';
+      locInp.style.cssText='width:100%;padding:5px 8px;font-size:12px';
+      locInp.onchange=()=>{ scene.location=locInp.value; };
+      tr.innerHTML=`<td style="padding:5px 10px;font-weight:700;color:var(--g)">${scene.num}</td><td style="padding:5px 10px">${scene.content}</td>`;
+      const locTd=document.createElement('td');locTd.style.padding='4px 8px';
+      locTd.appendChild(locInp);tr.appendChild(locTd);
+      tbody.appendChild(tr);
+    });
+  } else {
+    // シーン未入力の場合は汎用入力
+    bub.innerHTML='各シーンの撮影場所はシーン入力後に設定できます。<br>今は代表的な撮影場所を入力してください。';
+    const locInp2=document.createElement('input');
+    locInp2.className='ci';locInp2.placeholder='例：フロント、客室、屋外ドッグラン（カンマ区切り）';
+    locInp2.style.cssText='width:100%;padding:8px 12px;font-size:13px;margin-top:10px';
+    bub.appendChild(locInp2);
+    S._locationList=locInp2;
+  }
+
+  tbl.appendChild(tbody);
+  if (hasScenesAlready) bub.appendChild(tbl);
+
+  const confBtn=mkEl('button','confirm-btn');confBtn.textContent='✅ 確定する';confBtn.style.marginTop='10px';
+  confBtn.onclick=()=>{
+    if (hasScenesAlready) {
+      const inputs=[...tbl.querySelectorAll('input')];
+      S.scenes.forEach((scene,i)=>{ scene.location=inputs[i]?.value.trim()||''; });
+      addUser('施設内撮影場所を設定');
+    }
+    confBtn.disabled=true;
+    if (hasBothTypes) typing(()=>showOutdoorMoveForm());
+    else typing(()=>askLunchCutoff());
+  };
+  bub.appendChild(confBtn);
+
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+  pendingKey='indoorMove';waitText=false;
+  updateUI();
+}
+
+// ── ロケ地間移動フォーム ──────────────────────────────────────────────────
+function showOutdoorMoveForm() {
+  S.moves=[];
+  const area=document.getElementById('chatArea');
+  const wrap=mkEl('div','msg ai wide');
+  const av=mkEl('div','msg-av');av.textContent='AI';
+  const bub=mkEl('div','msg-bub');
+  bub.innerHTML='ロケ地間の移動情報を入力してください。<br><span style="font-size:12px;color:var(--mt)">複数の移動がある場合は行を追加してください</span>';
+
+  const list=document.createElement('div');
+  list.style.cssText='display:flex;flex-direction:column;gap:8px;margin-top:10px';
+
+  function addOutdoorRow() {
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;gap:7px;align-items:center;flex-wrap:wrap;padding:8px 10px;background:var(--su);border-radius:var(--rs);border:1px solid var(--bd)';
+
+    const mkLbl=(t)=>{const s=document.createElement('span');s.style.cssText='font-size:11.5px;color:var(--mt);white-space:nowrap';s.textContent=t;return s;};
+    const mkInp=(ph,w)=>{const i=document.createElement('input');i.className='ci';i.placeholder=ph;i.style.cssText=`width:${w}px;padding:6px 9px;font-size:12px`;return i;};
+
+    const afterInp=mkInp('どのカット後？例：C02の後',160);
+    const fromInp=mkInp('移動元 例：渋谷スタジオ',140);
+    const toInp=mkInp('移動先 例：屋上テラス',140);
+    const durSel=document.createElement('select');durSel.className='ci-sel';
+    durSel.style.cssText='padding:6px 8px;font-size:12px';
+    [10,15,20,30,45,60,90,120].forEach(m=>{
+      const opt=document.createElement('option');opt.value=m;
+      opt.textContent=m<60?m+'分':m===60?'1時間':(Math.floor(m/60))+'時間'+(m%60?m%60+'分':'');
+      durSel.appendChild(opt);
+    });
+    durSel.value=30;
+
+    const delBtn=document.createElement('button');
+    delBtn.textContent='✕';delBtn.style.cssText='padding:5px 9px;background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5;border-radius:4px;font-size:12px;cursor:pointer';
+    delBtn.onclick=()=>row.remove();
+
+    row.appendChild(mkLbl('タイミング:'));row.appendChild(afterInp);
+    row.appendChild(mkLbl('移動元:'));row.appendChild(fromInp);
+    row.appendChild(mkLbl('移動先:'));row.appendChild(toInp);
+    row.appendChild(mkLbl('時間:'));row.appendChild(durSel);
+    row.appendChild(delBtn);
+    list.appendChild(row);afterInp.focus();
+  }
+  addOutdoorRow();
+  bub.appendChild(list);
+
+  const addBtn=mkEl('button','add-btn');addBtn.textContent='＋ 移動を追加';addBtn.style.marginTop='8px';
+  addBtn.onclick=()=>addOutdoorRow();
+  bub.appendChild(addBtn);
+
+  const confBtn=mkEl('button','confirm-btn');confBtn.textContent='✅ 確定する';confBtn.style.marginTop='10px';
+  confBtn.onclick=()=>{
+    S.moves=[...list.children].map(row=>{
+      const inps=row.querySelectorAll('input');
+      const sel=row.querySelector('select');
+      return {afterCut:inps[0]?.value.trim()||'',from:inps[1]?.value.trim()||'',destination:inps[2]?.value.trim()||'',durationMin:parseInt(sel?.value)||30};
+    }).filter(m=>m.afterCut||m.destination);
+    const summary=S.moves.length?S.moves.map(m=>`${m.afterCut}→${m.destination}(${m.durationMin}分)`).join('、'):'なし';
+    addUser(`移動：${summary}`);
+    confBtn.disabled=true;
+    typing(()=>askLunchCutoff());
+  };
+  bub.appendChild(confBtn);
+
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+  pendingKey='outdoorMove';waitText=false;
+  updateUI();
+}
+
+// dummy to replace old form
+function _oldAskMoveInfoContent() {
+
+  S.moves = []; // [{afterCut, destination, durationMin}]
+
+  const list=document.createElement('div');
+  list.style.cssText='display:flex;flex-direction:column;gap:8px;margin-top:10px';
+
+  function addMoveRow() {
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;gap:7px;align-items:center;flex-wrap:wrap;padding:8px 10px;background:var(--su);border-radius:var(--rs);border:1px solid var(--bd)';
+
+    // どのカット後か（自由入力 or 「撮影開始前」）
+    const afterInp=document.createElement('input');
+    afterInp.className='ci';afterInp.placeholder='どのカットの後？例：C02の後、撮影開始前';
+    afterInp.style.cssText='width:200px;padding:6px 9px;font-size:12px';
+
+    // 移動先
+    const destInp=document.createElement('input');
+    destInp.className='ci';destInp.placeholder='移動先の場所名 例：屋上ドッグラン';
+    destInp.style.cssText='width:180px;padding:6px 9px;font-size:12px';
+
+    // 移動時間
+    const durSel=document.createElement('select');durSel.className='ci-sel';
+    durSel.style.cssText='padding:6px 8px;font-size:12px';
+    [15,20,30,45,60].forEach(m=>{
+      const opt=document.createElement('option');
+      opt.value=m;opt.textContent=m+'分';
+      durSel.appendChild(opt);
+    });
+
+    const delBtn=document.createElement('button');
+    delBtn.textContent='✕';
+    delBtn.style.cssText='padding:5px 9px;background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5;border-radius:4px;font-size:12px;cursor:pointer';
+    delBtn.onclick=()=>row.remove();
+
+    const lbl1=document.createElement('span');lbl1.style.cssText='font-size:11.5px;color:var(--mt);white-space:nowrap';lbl1.textContent='移動タイミング:';
+    const lbl2=document.createElement('span');lbl2.style.cssText='font-size:11.5px;color:var(--mt);white-space:nowrap';lbl2.textContent='移動先:';
+    const lbl3=document.createElement('span');lbl3.style.cssText='font-size:11.5px;color:var(--mt);white-space:nowrap';lbl3.textContent='移動時間:';
+
+    row.appendChild(lbl1);row.appendChild(afterInp);
+    row.appendChild(lbl2);row.appendChild(destInp);
+    row.appendChild(lbl3);row.appendChild(durSel);
+    row.appendChild(delBtn);
+    list.appendChild(row);
+    afterInp.focus();
+  }
+  addMoveRow();
+  bub.appendChild(list);
+
+  const addBtn=mkEl('button','add-btn');addBtn.textContent='＋ 移動を追加';addBtn.style.marginTop='8px';
+  addBtn.onclick=()=>addMoveRow();
+  bub.appendChild(addBtn);
+
+  // 移動なしボタン
+  const chips=mkEl('div','chips');chips.style.marginTop='8px';
+  const noneBtn=mkEl('button','chip');noneBtn.textContent='移動なし';
+  noneBtn.onclick=()=>{ addUser('移動なし'); S.moves=[]; typing(()=>askShootStart()); };
+  chips.appendChild(noneBtn);
+  bub.appendChild(chips);
+
+  const confBtn=mkEl('button','confirm-btn');confBtn.textContent='✅ 確定する';confBtn.style.marginTop='10px';
+  confBtn.onclick=()=>{
+    const rows=[...list.children];
+    S.moves=rows.map(row=>{
+      const inps=row.querySelectorAll('input');
+      const sel=row.querySelector('select');
+      return {
+        afterCut: inps[0]?.value.trim()||'',
+        destination: inps[1]?.value.trim()||'',
+        durationMin: parseInt(sel?.value)||15,
+      };
+    }).filter(m=>m.afterCut||m.destination);
+    if(!S.moves.length){ addUser('移動なし'); typing(()=>askShootStart()); return; }
+    const summary=S.moves.map(m=>`${m.afterCut}→${m.destination}(${m.durationMin}分)`).join('、');
+    addUser(`移動：${summary}`);
+    confBtn.disabled=true;
+    typing(()=>askShootStart());
+  };
+  bub.appendChild(confBtn);
+
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+  pendingKey='moveInfo';waitText=false;
+  document.getElementById('txtIn').placeholder='← 上のフォームで移動情報を入力してください';
+  updateUI();
+}
+
+function askShootStart() {
+  activeStep=3;
+  addAI('撮影開始時間を教えてください。\n（スタッフは1時間前に現場入りします）', ['9:00','10:00','8:00','その他（入力）'], 'shootStart');
+}
+function askClient() {
+  activeStep=4;
+  addAI('クライアントの来場はありますか？', ['来場する','来場しない','未定'], 'client');
+}
+function askClientTime() {
+  activeStep=4;
+  addAI(`クライアントの来場時間を教えてください。\n（撮影開始：${S.shootStart||'—'}）`, ['撮影開始30分前','撮影開始1時間前','朝から終日','その他（入力）'], 'clientTime');
+}
+function askLunch() {
+  activeStep=3;
+  addAI('お昼休憩はどのくらい取りますか？',
+    ['45分','60分','休憩なし'], 'lunch');
+}
+function askShootEnd() {
+  activeStep=3;
+  addAI('撮影終了（クランクアップ）の予定時間は？', ['16:00','17:00','18:00','その他（入力）'], 'shootEnd');
+}
+function askWrapUp() {
+  activeStep=3;
+  addAI('完全撤収の予定時間は？', ['17:00','18:00','19:00','その他（入力）'], 'wrapUp');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AIスケジュール自動生成
+// ══════════════════════════════════════════════════════════════════════════════
+function showAIScheduleForm() {
+  activeStep=5;
+  const area=document.getElementById('chatArea');
+  const wrap=mkEl('div','msg ai wide');
+  const av=mkEl('div','msg-av');av.textContent='AI';
+  const bub=mkEl('div','msg-bub');
+  bub.innerHTML='撮影の概要を入力してください。AIがスケジュールを自動で組み立てます。';
+
+  const form=document.createElement('div');
+  form.style.cssText='display:flex;flex-direction:column;gap:10px;margin-top:12px';
+
+  function makeField(label, placeholder, isTextarea=false) {
+    const wrap2=document.createElement('div');
+    const lbl=document.createElement('div');
+    lbl.style.cssText='font-size:11.5px;font-weight:600;color:var(--mt);margin-bottom:3px';
+    lbl.textContent=label;
+    const inp=isTextarea ? document.createElement('textarea') : document.createElement('input');
+    inp.className='ci';
+    inp.placeholder=placeholder;
+    inp.style.cssText='width:100%;padding:8px 10px;font-size:12.5px' + (isTextarea?';min-height:80px;resize:vertical':'');
+    wrap2.appendChild(lbl);wrap2.appendChild(inp);
+    return {wrap:wrap2, inp};
+  }
+
+  const castF    = makeField('出演者・氏名', '例：猫A はるまきちゃん、猫B おーちゃん、飼い主 田中さん');
+  const conteF   = makeField('コンテ一覧（1行1カット）',
+    'C01：ねこAがくつろいでいるシーン　リビング\nC02：ねこAが遊んでいるシーン　リビング\nC03：ねこAが食器で食べているシーン　ダイニング', true);
+  const notesF   = makeField('注意事項・撮影条件',
+    '例：猫Aと猫Bは一緒に撮影しない。前半が猫A後半が猫Bで香盤を組む。', true);
+
+  [castF, conteF, notesF].forEach(f=>form.appendChild(f.wrap));
+  bub.appendChild(form);
+
+  // 生成ボタン
+  const genBtn=mkEl('button','confirm-btn');
+  genBtn.textContent='🤖 AIでスケジュールを生成する';
+  genBtn.style.marginTop='12px';
+  genBtn.onclick=async()=>{
+    const castText=castF.inp.value.trim();
+    const conteText=conteF.inp.value.trim();
+    const notesText=notesF.inp.value.trim();
+    if(!conteText){toast('コンテ一覧を入力してください','err');return;}
+
+    genBtn.disabled=true;
+    genBtn.textContent='⏳ AIがスケジュールを組み立て中...';
+    addUser(`コンテ${conteText.split('\n').length}件・注意事項あり で生成依頼`);
+
+    try {
+      await generateAISchedule(castText, conteText, notesText);
+    } catch(e) {
+      toast('エラー: '+e.message,'err');
+      genBtn.disabled=false;
+      genBtn.textContent='🤖 AIでスケジュールを生成する';
+    }
+  };
+  bub.appendChild(genBtn);
+
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+  pendingKey='aiSchedule';waitText=false;
+  document.getElementById('txtIn').disabled=true;
+  updateUI();
+}
+
+async function generateAISchedule(castText, conteText, notesText) {
+  // 基本情報をプロンプトに組み込む
+  const baseInfo = [
+    S.title ? `タイトル：${S.title}` : '',
+    S.dateplace ? `日時・場所：${S.dateplace}` : '',
+    S.shootStart ? `撮影開始：${S.shootStart}` : '',
+    S.shootEnd ? `撮影終了予定：${S.shootEnd}` : '',
+    S.lunch && S.lunch!=='なし' ? `昼休憩：${S.lunch}` : '',
+    S.location ? `撮影場所：${S.location}` : '',
+  ].filter(Boolean).join('\n');
+
+  const prompt = `あなたはペット広告の撮影ディレクターです。以下の情報をもとに最適な撮影スケジュール（香盤表）を組み立ててください。
+
+【基本情報】
+${baseInfo}
+
+【出演者・キャスト】
+${castText}
+
+【コンテ一覧】
+${conteText}
+
+【注意事項・撮影条件】
+${notesText || 'なし'}
+
+以下のJSON形式で返答してください。JSON以外のテキストは不要です。
+
+{
+  "scenes": [
+    {
+      "num": "C01",
+      "content": "シーン内容",
+      "location": "撮影場所",
+      "cast": "出演キャスト名",
+      "durationMin": 45,
+      "note": "備考"
+    }
+  ],
+  "schedule_notes": "スケジュール全体の補足説明"
+}
+
+ルール：
+- scenesは撮影順に並べる（注意事項の条件を守ること）
+- durationMinは内容から推定（食べるシーン:猫60〜90分、くつろぐ:30〜45分、遊ぶ:45分等）
+- castは出演者名を記入
+- 撮影場所ごとにまとめてセットチェンジを最小化する
+- 注意事項がある場合は必ず守ること`;
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2000,
+      messages: [{role:'user', content: prompt}]
+    })
+  });
+
+  const data = await res.json();
+  const text = data.content?.[0]?.text || '';
+
+  // JSONをパース
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('AIの返答を解析できませんでした');
+
+  const result = JSON.parse(jsonMatch[0]);
+  const scenes = result.scenes || [];
+
+  if (!scenes.length) throw new Error('シーンが生成されませんでした');
+
+  // S.scenesに設定
+  S.scenes = scenes.map((s,i) => ({
+    num: s.num || `C${String(i+1).padStart(2,'0')}`,
+    content: s.content || '',
+    location: s.location || '',
+    cast: s.cast || '',
+    durationMin: s.durationMin || 45,
+    note: s.note || '',
+    type: 'スチール',
+    cam: '1カメ',
+  }));
+
+  // 結果を表示
+  const area=document.getElementById('chatArea');
+  const wrap=mkEl('div','msg ai wide');
+  const av=mkEl('div','msg-av');av.textContent='AI';
+  const bub=mkEl('div','msg-bub');
+
+  let html=`✅ <strong>${scenes.length}シーン</strong>のスケジュールを組み立てました！<br>`;
+  if(result.schedule_notes){
+    html+=`<div style="background:var(--gl);border-radius:7px;padding:8px 12px;font-size:12px;margin:8px 0;color:var(--gd)">${result.schedule_notes}</div>`;
+  }
+  html+=`<div style="background:var(--su);border-radius:7px;padding:8px 12px;font-size:12px;line-height:1.9;margin:8px 0">`;
+  S.scenes.forEach(s=>{
+    html+=`<div><strong style="color:var(--g);min-width:36px;display:inline-block">${s.num}</strong>`;
+    html+=`<span style="color:var(--mt);margin:0 6px;font-size:11px">${s.location||''}</span>`;
+    html+=`<span style="color:var(--mt);margin-right:6px;font-size:11px">${s.cast||''}</span>`;
+    html+=`${s.content}`;
+    const t=s.durationMin;
+    const tStr=t<60?t+'分':t===60?'1時間':t%60===0?(t/60)+'時間':(Math.floor(t/60))+'時間'+(t%60)+'分';
+    html+=`<span style="color:var(--mt);font-size:11px;margin-left:6px">(${tStr})</span>`;
+    html+='</div>';
+  });
+  html+='</div>';
+  bub.innerHTML=html;
+
+  const cd=mkEl('div','chips');cd.style.marginTop='9px';
+  const okBtn=mkEl('button','chip');okBtn.textContent='✅ このスケジュールで進む';
+  okBtn.style.cssText='background:var(--g);color:#fff;border-color:var(--g)';
+  okBtn.onclick=()=>{
+    addUser('このスケジュールで進む');
+    typing(()=>askLunchCutoff());
+  };
+  const redoBtn=mkEl('button','chip');redoBtn.textContent='✏️ 内容を修正して再生成';
+  redoBtn.onclick=()=>{
+    addUser('修正して再生成する');
+    typing(()=>showAIScheduleForm());
+  };
+  cd.appendChild(okBtn);cd.appendChild(redoBtn);
+  bub.appendChild(cd);
+
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+  document.getElementById('txtIn').disabled=false;
+}
+
+function askConte() {
+  activeStep=5;
+  addAI('スケジュール骨格が完成しました！🎉\n\n次に撮影カット情報を入力します。\nどの方法で入力しますか？',
+    ['📝 シーンを入力して時間を組み立てる','📎 コンテをアップロードする','✏️ カット数を手入力する'], 'conte');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// シーン入力 → 時間積み上げフロー
+// ══════════════════════════════════════════════════════════════════════════════
+// S.scenes = [{num, content, type, cam, durationMin}]
+// S.sceneIdx = 現在入力中のシーンインデックス
+
+function askSceneList() {
+  activeStep=5;
+  S.scenes = []; S.sceneIdx = 0;
+
+  const area=document.getElementById('chatArea');
+  const wrap=mkEl('div','msg ai wide');
+  const av=mkEl('div','msg-av');av.textContent='AI';
+  const bub=mkEl('div','msg-bub');
+  bub.innerHTML='撮影したいシーンを入力してください。<br><span style="font-size:12px;color:var(--mt)">行を追加してから「確定する」を押してください</span>';
+
+  // 入力行リスト
+  const inputList=document.createElement('div');
+  inputList.id='sceneInputList';
+  inputList.style.cssText='display:flex;flex-direction:column;gap:6px;margin-top:10px';
+
+  function addSceneInputRow(val='') {
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;gap:6px;align-items:center';
+    const idx=inputList.children.length+1;
+    const num=document.createElement('span');
+    num.style.cssText='font-size:12px;color:var(--g);font-weight:700;min-width:28px;font-family:"DM Mono",monospace';
+    num.textContent=`C${String(idx).padStart(2,'0')}`;
+    const inp=document.createElement('input');
+    inp.type='text';inp.className='ci';
+    inp.placeholder='例：ねこAが食器で食べるシーン';
+    inp.value=val;
+    inp.style.cssText='flex:1;padding:7px 10px;font-size:13px';
+    inp.addEventListener('keydown',e=>{
+      if(e.key==='Enter'){e.preventDefault();addSceneInputRow();
+        const rows=inputList.querySelectorAll('input.scene-content-inp');
+        rows[rows.length-1].focus();
+      }
+    });
+    inp.classList.add('scene-content-inp');
+
+    // 撮影場所入力
+    const locInp=document.createElement('input');
+    locInp.type='text';locInp.className='ci';
+    locInp.placeholder='撮影場所（任意）';
+    locInp.style.cssText='width:130px;padding:7px 10px;font-size:12px;flex-shrink:0';
+    locInp.classList.add('scene-loc-inp');
+
+    const delBtn=document.createElement('button');
+    delBtn.textContent='✕';
+    delBtn.style.cssText='padding:5px 9px;background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5;border-radius:4px;font-size:12px;cursor:pointer;flex-shrink:0';
+    delBtn.onclick=()=>{
+      row.remove();
+      [...inputList.children].forEach((r,i)=>{
+        r.querySelector('span').textContent=`C${String(i+1).padStart(2,'0')}`;
+      });
+    };
+    row.appendChild(num);row.appendChild(inp);row.appendChild(locInp);row.appendChild(delBtn);
+    inputList.appendChild(row);
+    inp.focus();
+  }
+
+  // 最初の1行
+  addSceneInputRow();
+  bub.appendChild(inputList);
+
+  // 行追加ボタン
+  const addBtn=mkEl('button','add-btn');
+  addBtn.textContent='＋ シーンを追加';
+  addBtn.style.marginTop='8px';
+  addBtn.onclick=()=>{
+    addSceneInputRow();
+  };
+  bub.appendChild(addBtn);
+
+  // 確定ボタン
+  const confBtn=mkEl('button','confirm-btn');
+  confBtn.textContent='✅ 確定する';
+  confBtn.style.marginTop='10px';
+  confBtn.onclick=()=>{
+    const contentInps=[...inputList.querySelectorAll('input.scene-content-inp')];
+    const locInps=[...inputList.querySelectorAll('input.scene-loc-inp')];
+    const vals=contentInps.map(i=>i.value.trim()).filter(Boolean);
+    if(!vals.length){toast('シーンを1つ以上入力してください','err');return;}
+    S.scenes=contentInps.map((inp,i)=>({
+      num:`C${String(i+1).padStart(2,'0')}`,
+      content:inp.value.trim(),
+      location:locInps[i]?.value.trim()||'',
+      type:'スチール',
+      cam:'1カメ',
+      durationMin:0,
+    })).filter(s=>s.content);
+    confBtn.disabled=true;
+    addUser(vals.map((v,i)=>`C${String(i+1).padStart(2,'0')}：${v}`).join('　'));
+    typing(()=>askMoreOrProceed());
+  };
+  bub.appendChild(confBtn);
+
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+  pendingKey='sceneList';waitText=false;
+  document.getElementById('txtIn').disabled=true;
+  document.getElementById('txtIn').placeholder='← 上のフォームにシーンを入力してください';
+  updateUI();
+}
+
+
+// ── シーン内容からデフォルト所要時間を推定 ─────────────────────────────────
+function estimateDuration(content) {
+  const c = content;
+  // ① 猫が食べる → 90分（犬より先に判定）
+  if (/猫.*食べ|ねこ.*食べ|ネコ.*食べ|食べ.*(猫|ねこ|ネコ)/.test(c)) return 90;
+  if (/(猫|ねこ|ネコ).*(食事|ご飯|フード|食器)/.test(c)) return 90;
+  // ② 犬が食べる → 60分
+  if (/犬.*食べ|いぬ.*食べ|ワンコ.*食べ|食べ.*(犬|いぬ|わんこ|ワンコ)/.test(c)) return 60;
+  if (/(犬|いぬ|わんこ|ワンコ).*(食事|ご飯|フード|食器)/.test(c)) return 60;
+  // 食べる系（種別不明）→ 60分
+  if (/食べ(る|てい|終わ)|食事|ご飯|フード.*食|食器.*食/.test(c)) return 60;
+  // ③ ペットが遊ぶ → 45分
+  if (/遊ぶ|遊んで|じゃれ|おもちゃ|ボール/.test(c)) return 45;
+  // ④ ペットがくつろぐ・寝る → 60分
+  if (/くつろ[ぐぎ]|寝て|寝る|まどろ|休んで|リラックス/.test(c)) return 60;
+  // ⑤ パッケージ・商品写真 → 30分
+  if (/パッケージ|商品|正面|アップ|クローズ|物撮り|ブツ撮り/.test(c)) return 30;
+  // ⑥ 散歩・ドッグラン → 60分
+  if (/散歩|ドッグラン|走る|外.*歩/.test(c)) return 60;
+  // その他
+  if (/2カメ|同時撮影/.test(c)) return 90;
+  if (/家族|飼い主|一緒|触れ合い/.test(c)) return 45;
+  if (/シャンプー|お風呂|グルーミング/.test(c)) return 45;
+  if (/集合写真|家族写真|ポーズ/.test(c)) return 30;
+  // デフォルト
+  return 45;
+}
+
+function parseSceneList(raw) {
+  // 最初に選んだ撮影種別をデフォルトに使う
+  const defaultType = S.medium && S.medium.includes('動画') && !S.medium.includes('スチール')
+    ? '動画' : 'スチール';
+  return raw.trim().split('\n')
+    .map(l=>l.trim()).filter(Boolean)
+    .map((content, i) => ({
+      num: `C${String(i+1).padStart(2,'0')}`,
+      content,
+      type: defaultType,
+      cam: '1カメ',
+      durationMin: 0, // askAllDurationsで上書き、estimateDurationでデフォルト提示
+    }));
+}
+
+
+// ── 全シーン一括で所要時間入力 ───────────────────────────────────────────
+
+// ── 撮影場所でグループ化するか確認 ───────────────────────────────────────
+
+// ── 撮影順の確認・並び替え ─────────────────────────────────────────────────
+function askSortScenes() {
+  activeStep=5;
+  const area=document.getElementById('chatArea');
+  const wrap=mkEl('div','msg ai wide');
+  const av=mkEl('div','msg-av');av.textContent='AI';
+  const bub=mkEl('div','msg-bub');
+  bub.innerHTML=`撮影順を確認してください。<br><span style="font-size:12px;color:var(--mt)">☰ をドラッグして順番を入れ替えられます。場所・キャストも確認しながら調整してください。</span>`;
+
+  // テーブル
+  const tbl=document.createElement('table');
+  tbl.style.cssText='width:100%;border-collapse:collapse;margin-top:10px;font-size:12.5px';
+  tbl.innerHTML=`<thead><tr>
+    <th style="background:var(--g);color:#fff;padding:6px 8px;width:22px"></th>
+    <th style="background:var(--g);color:#fff;padding:6px 10px;width:52px">順番</th>
+    <th style="background:var(--g);color:#fff;padding:6px 10px">内容</th>
+    <th style="background:var(--g);color:#fff;padding:6px 10px;width:120px">撮影場所</th>
+    <th style="background:var(--g);color:#fff;padding:6px 10px;width:120px">キャスト</th>
+  </tr></thead>`;
+
+  const tbody=document.createElement('tbody');
+  S.scenes.forEach((scene,i)=>{
+    const tr=document.createElement('tr');
+    tr.style.background=i%2===0?'#fff':'var(--su)';
+    tr.setAttribute('draggable','false');
+    tr.dataset.idx=i;
+
+    // drag handle
+    const hTd=document.createElement('td');
+    hTd.style.cssText='text-align:center;cursor:grab;color:var(--mt);font-size:14px;padding:0 4px;user-select:none;touch-action:none;-webkit-user-drag:none';
+    hTd.textContent='☰';
+    hTd.addEventListener('mousedown',()=>tr.setAttribute('draggable','true'));
+    hTd.addEventListener('mouseup',()=>tr.setAttribute('draggable','false'));
+    tr.appendChild(hTd);
+
+    // 順番番号（自動更新）
+    const numTd=document.createElement('td');
+    numTd.style.cssText='padding:6px 10px;font-weight:700;color:var(--g);text-align:center';
+    numTd.textContent=scene.num;
+    numTd.className='sort-num';
+    tr.appendChild(numTd);
+
+    // 内容（編集可）
+    const contentTd=document.createElement('td');
+    contentTd.style.cssText='padding:4px 8px';
+    const contentInp=document.createElement('input');
+    contentInp.className='ci';contentInp.value=scene.content||'';
+    contentInp.style.cssText='width:100%;padding:5px 8px;font-size:12px';
+    contentInp.setAttribute('draggable','false');
+    contentInp.onchange=()=>{ scene.content=contentInp.value; };
+    contentTd.appendChild(contentInp);
+    tr.appendChild(contentTd);
+
+    // 撮影場所（編集可）
+    const locTd=document.createElement('td');
+    locTd.style.cssText='padding:4px 8px';
+    const locInp=document.createElement('input');
+    locInp.className='ci';locInp.value=scene.location||'';
+    locInp.placeholder='例：リビング';
+    locInp.style.cssText='width:100%;padding:5px 8px;font-size:12px';
+    locInp.setAttribute('draggable','false');
+    locInp.onchange=()=>{ scene.location=locInp.value; };
+    locTd.appendChild(locInp);
+    tr.appendChild(locTd);
+
+    // キャスト（1名→プルダウン、2名以上→チェックボックス）
+    const castTd=document.createElement('td');
+    castTd.style.cssText='padding:4px 8px';
+    const castNames=(S.casts||[]).map(c=>c.name);
+    const currentCasts=(scene.cast||'').split('・').filter(Boolean);
+
+    if (castNames.length <= 1) {
+      // 1名以下：プルダウン（1名の場合はその名前をデフォルト選択）
+      const castSel=document.createElement('select');
+      castSel.className='ci-sel ci-cast-sort';
+      castSel.style.cssText='width:100%;padding:5px 6px;font-size:12px';
+      ['', ...castNames].forEach(name=>{
+        const opt=document.createElement('option');
+        opt.value=name; opt.textContent=name||'（選択）';
+        // 1名のみの場合はその名前をデフォルト、複数の場合はscene.castと一致するものを選択
+        const defaultVal = castNames.length===1 ? castNames[0] : (scene.cast||'');
+        if(name===defaultVal) opt.selected=true;
+        castSel.appendChild(opt);
+      });
+      // scene.castにもデフォルト値を反映
+      if (castNames.length===1 && !scene.cast) scene.cast=castNames[0];
+      castSel.onchange=()=>{ scene.cast=castSel.value; };
+      castTd.appendChild(castSel);
+    } else {
+      // 2名以上：チェックボックスで複数選択
+      const cbWrap=document.createElement('div');
+      cbWrap.style.cssText='display:flex;flex-wrap:wrap;gap:4px';
+      castNames.forEach(name=>{
+        const lbl=document.createElement('label');
+        lbl.style.cssText='display:flex;align-items:center;gap:3px;font-size:11.5px;cursor:pointer;white-space:nowrap';
+        lbl.setAttribute('draggable','false');
+        const cb=document.createElement('input');
+        cb.type='checkbox'; cb.value=name;
+        cb.checked=currentCasts.includes(name);
+        cb.style.cssText='cursor:pointer;accent-color:var(--g)';
+        cb.setAttribute('draggable','false');
+        cb.onchange=()=>{
+          const checked=[...cbWrap.querySelectorAll('input:checked')].map(i=>i.value);
+          scene.cast=checked.join('・');
+        };
+        const txt=document.createTextNode(name);
+        lbl.appendChild(cb); lbl.appendChild(txt);
+        cbWrap.appendChild(lbl);
+      });
+      castTd.appendChild(cbWrap);
+    }
+    tr.appendChild(castTd);
+
+    tbody.appendChild(tr);
+  });
+  tbl.appendChild(tbody);
+  bub.appendChild(tbl);
+
+  // ドラッグ&ドロップ
+  const dragTbody=tbody;
+
+  function setupSortDrag(tr, hTd) {
+    makeDraggable(hTd, tr, () => dragTbody);
+  }
+
+  // 確定ボタン
+  const confBtn=mkEl('button','confirm-btn');confBtn.textContent='✅ この順番で確定する';confBtn.style.marginTop='10px';
+  confBtn.onclick=()=>{
+    // 並び替え後の順番をS.scenesに反映
+    const rows=[...tbody.rows];
+    const newScenes=rows.map((tr,i)=>{
+      const inputs=tr.querySelectorAll('input');
+      const oldScene=S.scenes[parseInt(tr.dataset.idx)||i]||S.scenes[i];
+      return {
+        ...oldScene,
+        num:oldScene.num, // カット番号は変更しない
+        content:inputs[0]?.value.trim()||oldScene.content||'',
+        location:inputs[1]?.value.trim()||oldScene.location||'',
+        cast:(()=>{
+          const sel=tr.querySelector('.ci-cast-sort');
+          if(sel) return sel.value;
+          const checks=[...tr.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value);
+          return checks.length?checks.join('・'):(oldScene.cast||'');
+        })(),
+      };
+    });
+    S.scenes=newScenes;
+    addUser(`撮影順を確定（${newScenes.length}シーン）`);
+    confBtn.disabled=true;
+    // ロケ撮影の場合は移動情報を確認してからお昼へ
+    if (S.location && S.location.includes('ロケ')) {
+      typing(()=>askMoveInfo());
+    } else {
+      typing(()=>askLunchCutoff());
+    }
+  };
+  bub.appendChild(confBtn);
+
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+  pendingKey='sortScenes';waitText=false;
+  document.getElementById('txtIn').disabled=true;
+  document.getElementById('txtIn').placeholder='← ☰ をドラッグして順番を入れ替えてください';
+  updateUI();
+}
+
+function askGroupByLocation() {
+  activeStep=5;
+
+  // 場所が設定されているシーンが複数あるか確認
+  const locsSet = [...new Set(S.scenes.map(s=>s.location||'').filter(Boolean))];
+
+  if (locsSet.length <= 1) {
+    // 場所が1種類以下 → スキップしてお昼確認へ
+    typing(()=>askLunchCutoff());
+    return;
+  }
+
+  const area=document.getElementById('chatArea');
+  const wrap=mkEl('div','msg ai wide');
+  const av=mkEl('div','msg-av');av.textContent='AI';
+  const bub=mkEl('div','msg-bub');
+
+  // 現在の撮影順を表示
+  let html=`撮影場所が複数あります。<br><strong>撮影場所ごとにまとめますか？</strong><br>`;
+  html+=`<div style="background:var(--su);border-radius:7px;padding:8px 12px;font-size:12px;line-height:1.9;margin:8px 0">`;
+  html+=`<div style="color:var(--mt);font-size:10.5px;margin-bottom:4px">現在の順番</div>`;
+  S.scenes.forEach(s=>{
+    html+=`<div><strong style="color:var(--g);min-width:36px;display:inline-block">${s.num}</strong>`;
+    html+=`<span style="color:var(--mt);font-size:11px;margin-right:6px">${s.location||'場所未設定'}</span>`;
+    html+=`${s.content}</div>`;
+  });
+  html+=`</div>`;
+  bub.innerHTML=html;
+
+  const cd=mkEl('div','chips');
+
+  // 場所ごとにグループ化するボタン
+  const groupBtn=mkEl('button','chip');
+  groupBtn.textContent='📍 撮影場所ごとにまとめる';
+  groupBtn.style.cssText='background:#F0F8FF;color:var(--b);border-color:var(--bl)';
+  groupBtn.onclick=()=>{
+    // 場所の順番を確定（最初に登場した場所の順）
+    const locOrder=[];
+    S.scenes.forEach(s=>{
+      const loc=s.location||'場所未設定';
+      if(!locOrder.includes(loc)) locOrder.push(loc);
+    });
+    // シーンを場所順に並び替え（各場所内は元の順番を維持）
+    const grouped=[];
+    locOrder.forEach(loc=>{
+      S.scenes.filter(s=>(s.location||'場所未設定')===loc).forEach(s=>grouped.push(s));
+    });
+    // 番号を振り直す
+    grouped.forEach((s,i)=>{ s.num=`C${String(i+1).padStart(2,'0')}`; });
+    S.scenes=grouped;
+    addUser(`場所ごとにまとめました（${locOrder.join('→')}）`);
+    typing(()=>showGroupedPreview(locOrder));
+  };
+
+  const skipBtn=mkEl('button','chip');
+  skipBtn.textContent='このままの順番で進む';
+  skipBtn.onclick=()=>{
+    addUser('このままの順番で進む');
+    typing(()=>askLunchCutoff());
+  };
+
+  cd.appendChild(groupBtn);cd.appendChild(skipBtn);
+  bub.appendChild(cd);
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+  pendingKey='groupByLoc';waitText=false;
+  document.getElementById('txtIn').placeholder='← 上の選択肢をクリックしてください';
+  updateUI();
+}
+
+// ── グループ化後のプレビューと場所間セットチェンジ設定 ────────────────────
+function showGroupedPreview(locOrder) {
+  const area=document.getElementById('chatArea');
+  const wrap=mkEl('div','msg ai wide');
+  const av=mkEl('div','msg-av');av.textContent='AI';
+  const bub=mkEl('div','msg-bub');
+
+  let html=`グループ化しました！<br>`;
+  html+=`<div style="background:var(--su);border-radius:7px;padding:8px 12px;font-size:12px;line-height:1.9;margin:8px 0">`;
+  locOrder.forEach((loc,li)=>{
+    html+=`<div style="font-weight:700;color:var(--g);margin-top:${li>0?'6px':'0'}">📍 ${loc}</div>`;
+    S.scenes.filter(s=>(s.location||'場所未設定')===loc).forEach(s=>{
+      html+=`<div style="padding-left:12px"><span style="color:var(--mt);min-width:36px;display:inline-block">${s.num}</span>${s.content}</div>`;
+    });
+  });
+  html+=`</div>`;
+
+  // 場所間のセットチェンジ時間を設定
+  html+=`<strong>場所間のセットチェンジ時間を設定してください</strong>`;
+  bub.innerHTML=html;
+
+  // 場所間ごとにセットチェンジ時間セレクト
+  const scWrap=document.createElement('div');
+  scWrap.style.cssText='display:flex;flex-direction:column;gap:7px;margin-top:8px';
+  const scRefs=[];
+
+  for(let i=0;i<locOrder.length-1;i++){
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:8px;font-size:12.5px';
+    const lbl=document.createElement('span');
+    lbl.textContent=`${locOrder[i]} → ${locOrder[i+1]}`;
+    lbl.style.cssText='flex:1;color:var(--tx)';
+    const sel=document.createElement('select');sel.className='ci-sel';
+    sel.style.cssText='padding:6px 10px;font-size:12px;width:90px';
+    [5,10,15,20,30,45,60].forEach(m=>{
+      const opt=document.createElement('option');opt.value=m;
+      opt.textContent=m+'分';if(m===15)opt.selected=true;
+      sel.appendChild(opt);
+    });
+    row.appendChild(lbl);row.appendChild(sel);
+    scWrap.appendChild(row);
+    scRefs.push({from:locOrder[i],to:locOrder[i+1],sel});
+  }
+  bub.appendChild(scWrap);
+
+  const confBtn=mkEl('button','confirm-btn');confBtn.textContent='✅ この順番で進む';confBtn.style.marginTop='10px';
+  confBtn.onclick=()=>{
+    S.locationChanges=scRefs.map(r=>({from:r.from,to:r.to,min:parseInt(r.sel.value)}));
+    addUser('この順番で進む');
+    confBtn.disabled=true;
+    typing(()=>askLunchCutoff());
+  };
+  bub.appendChild(confBtn);
+
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+  pendingKey='groupPreview';waitText=false;
+  updateUI();
+}
+
+function askAllDurations() {
+  activeStep=5;
+  const area=document.getElementById('chatArea');
+  const wrap=mkEl('div','msg ai wide');
+  const av=mkEl('div','msg-av');av.textContent='AI';
+  const bub=mkEl('div','msg-bub');
+
+  bub.innerHTML=`各シーンの撮影場所と所要時間を確認してください。<br><span style="font-size:11.5px;color:var(--mt)">設定後「確定する」を押してください</span>`;
+
+  const DUR_OPTS=[15,30,45,60,75,90,120,150,180];
+
+  // テーブル形式で全シーン表示
+  const tbl=document.createElement('table');
+  tbl.style.cssText='width:100%;border-collapse:collapse;margin-top:10px;font-size:12.5px';
+  tbl.innerHTML=`<thead><tr>
+    <th style="background:var(--g);color:#fff;padding:6px 10px;text-align:left;width:52px">No.</th>
+    <th style="background:var(--g);color:#fff;padding:6px 10px;text-align:left">内容</th>
+    <th style="background:var(--g);color:#fff;padding:6px 10px;text-align:left;width:140px">撮影場所</th>
+    <th style="background:var(--g);color:#fff;padding:6px 10px;text-align:left;width:100px">所要時間</th>
+  </tr></thead>`;
+
+  const tbody=document.createElement('tbody');
+  const selRefs=[]; // {durSel, scene}
+
+  S.scenes.forEach((scene,i)=>{
+    const tr=document.createElement('tr');
+    tr.style.background=i%2===0?'#fff':'var(--su)';
+
+    // No.
+    const tdNum=document.createElement('td');
+    tdNum.style.cssText='padding:6px 10px;font-weight:700;color:var(--g)';
+    tdNum.textContent=scene.num;
+    tr.appendChild(tdNum);
+
+    // 内容
+    const tdContent=document.createElement('td');
+    tdContent.style.cssText='padding:6px 10px;color:var(--tx)';
+    tdContent.textContent=scene.content;
+    tr.appendChild(tdContent);
+
+    // 撮影場所入力
+    const tdLoc=document.createElement('td');
+    tdLoc.style.padding='4px 8px';
+    const locInpD=document.createElement('input');
+    locInpD.type='text';locInpD.className='ci dur-loc-inp';
+    locInpD.placeholder='例：フロント・客室';
+    locInpD.value=scene.location||'';
+    locInpD.style.cssText='width:100%;padding:5px 8px;font-size:12px';
+    locInpD.onchange=()=>{ scene.location=locInpD.value; };
+    tdLoc.appendChild(locInpD);
+    tr.appendChild(tdLoc);
+
+    // 所要時間セレクト
+    const tdDur=document.createElement('td');
+    tdDur.style.padding='4px 8px';
+    const durSel=document.createElement('select');
+    durSel.className='ci-sel';
+    durSel.style.cssText='width:100%;padding:5px;font-size:12px';
+    DUR_OPTS.forEach(m=>{
+      const opt=document.createElement('option');
+      opt.value=m;
+      opt.textContent=m<60?m+'分':m===60?'1時間':m%60===0?(m/60)+'時間':(Math.floor(m/60))+'時間'+(m%60)+'分';
+      if(scene.durationMin===m) opt.selected=true;
+      durSel.appendChild(opt);
+    });
+    // シーン内容からデフォルト時間を推定
+    const estimated = estimateDuration(scene.content);
+    durSel.value = scene.durationMin || estimated;
+    tdDur.appendChild(durSel);
+    tr.appendChild(tdDur);
+
+    tbody.appendChild(tr);
+    selRefs.push({durSel, scene});
+  });
+  tbl.appendChild(tbody);
+  bub.appendChild(tbl);
+
+  // 確定ボタン
+  const confBtn=mkEl('button','confirm-btn');
+  confBtn.textContent='✅ この時間で確定する';
+  confBtn.style.marginTop='12px';
+  confBtn.onclick=()=>{
+    // 全シーンに値を反映
+    selRefs.forEach(({durSel,locInpD,scene})=>{
+      scene.durationMin=parseInt(durSel.value);
+      scene.location=locInpD?.value.trim()||scene.location||'';
+    });
+    const summary=S.scenes.map(s=>{
+      const t=s.durationMin;
+      const tStr=t<60?t+'分':t===60?'1時間':t%60===0?(t/60)+'時間':(Math.floor(t/60))+'時間'+(t%60)+'分';
+      return `${s.num}:${tStr}(${s.cam})`;
+    }).join('  ');
+    addUser(`時間確定：${summary}`);
+    confBtn.disabled=true;
+    if(S._fromBrief){
+      typing(()=>buildSceneSchedule());
+    } else if(S.lunch&&S.lunch!=='なし'){
+      typing(()=>askLunchCutoff());
+    } else {
+      typing(()=>buildSceneSchedule());
+    }
+  };
+  bub.appendChild(confBtn);
+
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+  pendingKey='allDur';waitText=false;
+  document.getElementById('txtIn').disabled=true;
+  document.getElementById('txtIn').placeholder='← 上の表で時間を設定してください';
+  updateUI();
+}
+
+function askSceneDuration(idx) {
+  activeStep=5;
+  const scene = S.scenes[idx];
+  const total = S.scenes.length;
+  const area = document.getElementById('chatArea');
+  const wrap = mkEl('div','msg ai');
+  const av = mkEl('div','msg-av'); av.textContent='AI';
+  const bub = mkEl('div','msg-bub');
+
+  bub.innerHTML = `<span style="font-size:11px;color:var(--mt)">${idx+1}/${total}</span><br>` +
+    `<strong>「${scene.content}」</strong><br>` +
+    `<span style="font-size:13px">どのくらい時間を見込みますか？</span>`;
+
+
+
+  // 所要時間ボタン
+  const durRow = document.createElement('div');
+  durRow.style.cssText = 'display:flex;gap:7px;flex-wrap:wrap;margin-top:10px';
+  const durs = [
+    {label:'15分', min:15},
+    {label:'30分', min:30},
+    {label:'45分', min:45},
+    {label:'1時間', min:60},
+    {label:'1時間15分', min:75},
+    {label:'1時間30分', min:90},
+    {label:'2時間', min:120},
+    {label:'2時間30分', min:150},
+    {label:'3時間', min:180},
+  ];
+  durs.forEach(d=>{
+    const btn=mkEl('button','chip'); btn.textContent=d.label;
+    btn.onclick=()=>{
+      btn.disabled=true;
+      scene.cam = '1カメ';
+      scene.durationMin = d.min;
+      addUser(`「${scene.content}」→ ${d.label}`);
+      S.sceneIdx++;
+      if (S.sceneIdx < S.scenes.length) {
+        typing(()=>askSceneDuration(S.sceneIdx));
+      } else {
+        typing(()=>buildSceneSchedule());
+      }
+    };
+    durRow.appendChild(btn);
+  });
+  bub.appendChild(durRow);
+
+  wrap.appendChild(av); wrap.appendChild(bub);
+  area.appendChild(wrap); area.scrollTop=area.scrollHeight;
+  pendingKey='sceneDur'; waitText=false;
+  document.getElementById('txtIn').disabled=true;
+  document.getElementById('txtIn').placeholder='← 上の選択肢をクリックしてください';
+  updateUI();
+}
+
+
+// ── お昼前までシーン確認 ──────────────────────────────────────────────────
+
+// ── シーン確認・追加かどうか ────────────────────────────────────────────────
+function askMoreOrProceed() {
+  if (S._skipTimeline) {
+    S._skipTimeline = false;
+    return;
+  }
+  activeStep=5;
+  const area=document.getElementById('chatArea');
+  const wrap=mkEl('div','msg ai');
+  const av=mkEl('div','msg-av');av.textContent='AI';
+  const bub=mkEl('div','msg-bub');
+
+  // 現在のシーン一覧を表示
+  let html=`現在 <strong>${S.scenes.length}シーン</strong> 入力されています。<br>`;
+  html+=`<div style="background:var(--su);border-radius:7px;padding:8px 12px;font-size:12px;line-height:1.9;margin:8px 0">`;
+  html+=S.scenes.map(s=>`<div><strong style="color:var(--g)">${s.num}</strong>　${s.content}</div>`).join('');
+  html+=`</div>まだ追加しますか？`;
+  bub.innerHTML=html;
+
+  const cd=mkEl('div','chips');
+  const addBtn=mkEl('button','chip');addBtn.textContent='➕ シーンを追加する';
+  addBtn.onclick=()=>{ addUser('シーンを追加する'); typing(()=>askMoreScenes()); };
+
+  const proceedBtn=mkEl('button','chip');
+  proceedBtn.textContent='✅ これで確定する';
+  proceedBtn.style.cssText='background:var(--g);color:#fff;border-color:var(--g)';
+  proceedBtn.onclick=()=>{ addUser('これで確定する'); typing(()=>askSortScenes()); };
+
+  cd.appendChild(addBtn); cd.appendChild(proceedBtn);
+  bub.appendChild(cd);
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+  pendingKey='moreOrProceed';waitText=false;
+  document.getElementById('txtIn').disabled=true;
+  document.getElementById('txtIn').placeholder='← 上の選択肢をクリックしてください';
+  updateUI();
+}
+
+function askLunchCutoff() {
+  activeStep=5;
+  if (!S.lunch || S.lunch==='なし') {
+    S.lunchCutoff = null;
+    typing(()=>askAllDurations());
+    return;
+  }
+  const list = S.scenes.map((s,i)=>`${s.num}：${s.content}`).join('\n');
+  const chips = S.scenes.map(s=>s.num);
+  chips.push('全部午前中に終わらせる');
+  chips.push('午後からスタート');
+
+  const area=document.getElementById('chatArea');
+  const wrap=mkEl('div','msg ai');
+  const av=mkEl('div','msg-av');av.textContent='AI';
+  const bub=mkEl('div','msg-bub');
+  bub.innerHTML=`お昼（${S.lunch}）までに終わらせたいのは<br>どのシーンまでですか？`;
+
+  // シーン一覧を表示
+  const listDiv=document.createElement('div');
+  listDiv.style.cssText='background:var(--su);border-radius:7px;padding:8px 12px;font-size:12px;line-height:1.9;margin:8px 0;color:var(--mt)';
+  listDiv.innerHTML=S.scenes.map(s=>`<div><strong style="color:var(--g)">${s.num}</strong>　${s.content}</div>`).join('');
+  bub.appendChild(listDiv);
+
+  const cd=mkEl('div','chips');
+  S.scenes.forEach(s=>{
+    const btn=mkEl('button','chip');
+    btn.textContent=`${s.num}まで`;
+    btn.onclick=()=>{
+      S.lunchCutoff=s.num;
+      addUser(`${s.num}まで午前中に撮影`);
+      typing(()=>askAllDurations());
+    };
+    cd.appendChild(btn);
+  });
+  const allBtn=mkEl('button','chip');allBtn.textContent='全部午前中';
+  allBtn.onclick=()=>{ S.lunchCutoff='all'; addUser('全部午前中'); typing(()=>askAllDurations()); };
+  const aftBtn=mkEl('button','chip');aftBtn.textContent='午後からスタート';
+  aftBtn.onclick=()=>{ S.lunchCutoff='none'; addUser('午後からスタート'); typing(()=>askAllDurations()); };
+  cd.appendChild(allBtn);cd.appendChild(aftBtn);
+  bub.appendChild(cd);
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+  pendingKey='lunchCutoff';waitText=false;
+  document.getElementById('txtIn').disabled=true;
+  document.getElementById('txtIn').placeholder='← 上の選択肢をクリックしてください';
+  updateUI();
+}
+
+// ── セットチェンジ箇所確認 ────────────────────────────────────────────────
+function askSetChanges() {
+  activeStep=5;
+  if (S.scenes.length <= 1) {
+    S.setChangeAfter=[];
+    S.sceneIdx=0;
+    typing(()=>askSceneDuration(0));
+    return;
+  }
+
+  const area=document.getElementById('chatArea');
+  const wrap=mkEl('div','msg ai');
+  const av=mkEl('div','msg-av');av.textContent='AI';
+  const bub=mkEl('div','msg-bub');
+  bub.innerHTML='セットチェンジが必要なのはどのシーンとシーンの間ですか？<br><span style="font-size:12px;color:var(--mt)">複数選べます。不要な場合は「なし」を選んでください。</span>';
+
+  S.setChangeAfter = []; // 選択されたカット番号（そのカットの後にセットチェンジ）
+
+  const cd=mkEl('div','chips');
+
+  // シーン間のボタン（C01とC02の間 → 'C01'の後）
+  for (let i=0;i<S.scenes.length-1;i++) {
+    const a=S.scenes[i], b=S.scenes[i+1];
+    const btn=mkEl('button','chip');
+    btn.textContent=`${a.num}→${b.num}の間`;
+    btn.dataset.cut=a.num;
+    btn.onclick=()=>{
+      btn.classList.toggle('chip-selected');
+      btn.style.background = btn.classList.contains('chip-selected') ? 'var(--g)' : '';
+      btn.style.color = btn.classList.contains('chip-selected') ? '#fff' : '';
+      btn.style.borderColor = btn.classList.contains('chip-selected') ? 'var(--g)' : '';
+      const idx2=S.setChangeAfter.indexOf(a.num);
+      if(btn.classList.contains('chip-selected')) { if(idx2<0) S.setChangeAfter.push(a.num); }
+      else { if(idx2>=0) S.setChangeAfter.splice(idx2,1); }
+    };
+    cd.appendChild(btn);
+  }
+
+  const noneBtn=mkEl('button','chip');noneBtn.textContent='セットチェンジなし';
+  noneBtn.onclick=()=>{ S.setChangeAfter=[]; addUser('セットチェンジなし'); S.sceneIdx=0; typing(()=>askGroupByLocation()); };
+  cd.appendChild(noneBtn);
+
+  const okBtn=mkEl('button','chip');
+  okBtn.textContent='✅ 選択完了';
+  okBtn.style.cssText='background:var(--g);color:#fff;border-color:var(--g)';
+  okBtn.onclick=()=>{
+    const sel=S.setChangeAfter;
+    const display=sel.length?sel.map(n=>n+'の後').join('、'):'なし';
+    addUser(`セットチェンジ：${display}`);
+    S.sceneIdx=0;
+    typing(()=>buildSceneSchedule());
+  };
+  cd.appendChild(okBtn);
+  bub.appendChild(cd);
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+  pendingKey='setChanges';waitText=false;
+  document.getElementById('txtIn').disabled=true;
+  document.getElementById('txtIn').placeholder='← セットチェンジ箇所を選んでください';
+  updateUI();
+}
+
+function buildSceneSchedule() {
+  const savedLunchCutoff = S.lunchCutoff; // お昼区切りを保存
+  S.lunchCutoff = ''; // buildSceneSchedule中はlunchCutoffを使わない
+  const startMin = parseTime(S.shootStart) || 9*60;
+  // S.lunch = "12:30〜60分" → lunchStartMin=12:30, lunchDurMin=60
+  const parseLunch = () => {
+    if (!S.lunch || S.lunch==='なし') return {start:null, dur:60};
+    const dur = parseInt((S.lunch.match(/(\d+)分/)||[0,60])[1]);
+    // 開始時間はlunchCutoffのシーン終了後（buildで動的に決まる）
+    return {start:null, dur};
+  };
+  const {start:lunchStartMin, dur:lunchDurMin} = parseLunch();
+  const SET_CHANGE = 15;
+  const setAfter = S.setChangeAfter || [];
+
+  // lunchCutoff: どのシーンまで午前か
+  // 'all'=全部午前, 'none'=全部午後, 'Cxx'=そのカットまで午前
+  let cursor = startMin;
+  const cuts = [];
+  let lunchInserted = false;
+
+  S.scenes.forEach((scene, i) => {
+    if (!scene.durationMin) scene.durationMin = 60;
+
+    const startT = minToStr(cursor);
+    const endT   = minToStr(cursor + scene.durationMin);
+    cuts.push({row_type:'cut',num:scene.num,timeS:startT,timeE:endT,
+      content:scene.content,type:scene.type,cam:scene.cam,
+      location:scene.location||'',cast:scene.cast||'',durationMin:scene.durationMin||0,note:''});
+    cursor += scene.durationMin;
+
+    // お昼休憩をlunchCutoffの直後に挿入
+    if (!lunchInserted && S.lunch && S.lunch!=='なし' && savedLunchCutoff) {
+      const lc = savedLunchCutoff;
+      if (lc!=='all' && lc!=='none' && scene.num===lc) {
+        cuts.push({row_type:'break',
+          timeS:endT, timeE:minToStr(cursor+lunchDurMin),
+          content:`昼休憩・準備（${lunchDurMin}分）`,num:'',type:'',cam:'',note:''});
+        cursor += lunchDurMin;
+        lunchInserted = true;
+      }
+    }
+
+    // 移動行（ロケの場合）
+    if (S.moves && S.moves.length) {
+      S.moves.forEach(move=>{
+        if (move.afterCut && move.afterCut.includes(scene.num)) {
+          cuts.push({row_type:'move',timeS:endT,timeE:minToStr(cursor+move.durationMin),
+            content:`移動${move.destination?'：'+move.destination:''}（${move.durationMin}分）`,
+            num:'',type:'',cam:'',note:move.destination||''});
+          cursor+=move.durationMin;
+        }
+      });
+    }
+
+    // セットチェンジ（手動選択 or 場所の変わり目）
+    const nextScene = S.scenes[i+1];
+    const locChanged = nextScene && (scene.location||'') !== (nextScene.location||'') && (scene.location||nextScene.location);
+    const scMin = locChanged && S.locationChanges
+      ? (S.locationChanges.find(lc=>lc.from===(scene.location||'')&&lc.to===(nextScene.location||''))?.min || SET_CHANGE)
+      : SET_CHANGE;
+    if ((setAfter.includes(scene.num) || locChanged) && i < S.scenes.length-1) {
+      const scLabel = locChanged ? `移動・セットチェンジ（${scMin}分）📍${nextScene.location||''}` : 'セットチェンジ';
+      cuts.push({row_type:'set_change',timeS:endT,timeE:minToStr(cursor+scMin),
+        content:scLabel,num:'',type:'',cam:'',note:`${scMin}分`});
+      cursor += scMin;
+    }
+  });
+
+  // 全カット後にお昼未挿入かつall指定の場合
+  if (!lunchInserted && S.lunch && S.lunch!=='なし' && savedLunchCutoff==='all') {
+    const lastCut = cuts.filter(r=>r.row_type==='cut').slice(-1)[0];
+    if (lastCut) {
+      cuts.push({row_type:'break',
+        timeS:lastCut.timeE, timeE:minToStr(parseTime(lastCut.timeE)+lunchDurMin),
+        content:`昼休憩・準備（${lunchDurMin}分）`,num:'',type:'',cam:'',note:''});
+    }
+  }
+
+  S.cutsData = cuts;
+  S.lunchCutoff = savedLunchCutoff; // 復元
+  const cutOnly = cuts.filter(r=>r.row_type==='cut');
+  S.cutsTotal = `${cutOnly.length}カット`;
+  updateSummary();
+
+  // 終了予定時間を自動更新
+  const finMin = parseTime(cuts.filter(r=>r.row_type==='cut').slice(-1)[0]?.timeE);
+  if (finMin && !S.shootEnd) S.shootEnd = minToStr(finMin);
+
+  const totalMins = S.scenes.reduce((s,sc)=>s+sc.durationMin,0) + (S.scenes.length-1)*SET_CHANGE;
+  const finStr = minToStr(startMin + totalMins);
+
+  // サマリー表示
+  const area=document.getElementById('chatArea');
+  const wrap=mkEl('div','msg ai');
+  const av=mkEl('div','msg-av');av.textContent='AI';
+  const bub=mkEl('div','msg-bub');
+  let html=`✅ <strong>${cutOnly.length}カット</strong>のタイムラインを自動生成しました！<br>`;
+  html+=`<div style="background:var(--su);border-radius:8px;padding:9px 13px;font-size:12px;line-height:1.9;margin:8px 0">`;
+  cutOnly.forEach(cut=>{
+    html+=`<div><span style="color:var(--g);font-weight:600;min-width:36px;display:inline-block">${cut.num}</span>`;
+    html+=`<span style="color:var(--mt);margin-right:6px">${cut.timeS}〜${cut.timeE}</span>`;
+    html+=`${cut.content}`;
+    if(cut.cam==='2カメ同時') html+=` <span style="font-size:11px;background:#FFF3E0;color:#E65100;padding:1px 6px;border-radius:8px;margin-left:4px">2カメ</span>`;
+    html+=`</div>`;
+  });
+  html+=`</div>`;
+  html+=`<span style="font-size:12px;color:var(--mt)">撮影終了予定：<strong>${finStr}</strong>頃（セットチェンジ含む）</span>`;
+
+  bub.innerHTML=html;
+
+  const cd=mkEl('div','chips');cd.style.marginTop='9px';
+
+  const okBtn=mkEl('button','chip');okBtn.textContent='✅ このタイムラインで進む';
+  okBtn.onclick=()=>{
+    addUser('このタイムラインで進む');
+    typing(()=>showEditTable());
+  };
+  cd.appendChild(okBtn);
+  bub.appendChild(cd);
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+  document.getElementById('txtIn').disabled=false;
+
+  // ── お昼休憩の提案を別バブルで表示 ──────────────────────────────────────
+  // 超過あり・お昼区切り確定済みの場合はスキップ
+  if (S.lunch && S.lunch !== 'なし' && !S._lunchCutoffFixed && !S._skipTimeline) {
+    setTimeout(()=>showLunchProposal(cutOnly), 400);
+  }
+}
+
+
+// ── AI生成後のお昼区切り選択（選択後はshowEditTableへ） ──────────────────
+function askLunchCutoffForAI(cutOnly) {
+  activeStep=5;
+  const area=document.getElementById('chatArea');
+  const wrap=mkEl('div','msg ai wide');
+  const av=mkEl('div','msg-av');av.textContent='AI';
+  const bub=mkEl('div','msg-bub');
+
+  let html=`お昼（${S.lunch||'60分'}）までに終わらせたいのはどのシーンまでですか？<br>`;
+  html+=`<div style="background:var(--su);border-radius:7px;padding:8px 12px;font-size:12px;line-height:1.9;margin:8px 0">`;
+  (cutOnly||S.scenes).forEach(s=>{
+    html+=`<div><strong style="color:var(--g);min-width:36px;display:inline-block">${s.num}</strong>${s.content}</div>`;
+  });
+  html+=`</div>`;
+  bub.innerHTML=html;
+
+  const cd=mkEl('div','chips');
+  (cutOnly||S.scenes).forEach(s=>{
+    const btn=mkEl('button','chip');btn.textContent=`${s.num}まで`;
+    btn.onclick=()=>{
+      S.lunchCutoff=s.num;
+      S._lunchCutoffFixed=true;
+      S.scheduleRows=[];
+      addUser(`${s.num}まで午前中に撮影`);
+      typing(()=>{ buildSceneSchedule(); setTimeout(()=>checkOvertime(),500); });
+    };
+    cd.appendChild(btn);
+  });
+  const allBtn=mkEl('button','chip');allBtn.textContent='全部午前中';
+  allBtn.onclick=()=>{ S.lunchCutoff='all'; S._lunchCutoffFixed=true; addUser('全部午前中'); typing(()=>showEditTable()); };
+  const aftBtn=mkEl('button','chip');aftBtn.textContent='午後からスタート';
+  aftBtn.onclick=()=>{ S.lunchCutoff='none'; S._lunchCutoffFixed=true; addUser('午後からスタート'); typing(()=>showEditTable()); };
+  cd.appendChild(allBtn);cd.appendChild(aftBtn);
+  bub.appendChild(cd);
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+  pendingKey='lunchCutoffAI';waitText=false;
+  updateUI();
+}
+
+
+// ── お昼確定後の超過チェック ──────────────────────────────────────────────
+function checkOvertime() {
+  if (!S.shootEnd || !S.scenes || !S.scenes.length) return;
+  const startMin = parseTime(S.shootStart) || 9*60;
+  const shootEndMin = parseTime(S.shootEnd);
+  if (!shootEndMin) return;
+
+  // S.cutsData から最終終了時間を計算
+  const lastCut = (S.cutsData||[]).filter(r=>r.row_type==='cut'||r.row_type==='break').slice(-1)[0];
+  const finMin = lastCut ? parseTime(lastCut.timeE) : null;
+  if (!finMin) return;
+
+  // セットチェンジ等を加味した実際の終了時間
+  const allRows = S.cutsData||[];
+  const lastRow = allRows.slice(-1)[0];
+  const actualEndMin = lastRow ? (parseTime(lastRow.timeE)||parseTime(lastRow.timeS)||finMin) : finMin;
+
+  if (actualEndMin <= shootEndMin) return; // 超過なし
+
+  const overMin = actualEndMin - shootEndMin;
+  const roundedOver = Math.ceil(overMin / 30) * 30;
+  const earlyStart = minToStr(startMin - roundedOver);
+
+  const area = document.getElementById('chatArea');
+  const wrap = mkEl('div','msg ai');
+  const av = mkEl('div','msg-av'); av.textContent='AI';
+  const bub = mkEl('div','msg-bub');
+  bub.innerHTML=`<div style="background:#FEE2E2;border-radius:7px;padding:8px 12px;font-size:12px;color:#DC2626">
+    ⚠️ 設定した撮影終了時間（${S.shootEnd}）を<strong>${overMin}分超過</strong>します。<br>
+    撮影開始を <strong>${earlyStart}</strong> にすると収まります。
+  </div>`;
+
+  const cd = mkEl('div','chips'); cd.style.marginTop='8px';
+  const adjustBtn = mkEl('button','chip');
+  adjustBtn.textContent=`⏰ 開始を${earlyStart}に変更する`;
+  adjustBtn.style.cssText='background:#FEF2F2;color:#DC2626;border-color:#FCA5A5;font-weight:600';
+  adjustBtn.onclick=()=>{
+    S.shootStart=earlyStart;
+    S._lunchCutoffFixed=true;
+    S.scheduleRows=[];
+    addUser(`撮影開始を${earlyStart}に変更`);
+    typing(()=>buildSceneSchedule());
+  };
+  const skipBtn=mkEl('button','chip');
+  skipBtn.textContent='このまま進む';
+  skipBtn.onclick=()=>{ addUser('このまま進む'); typing(()=>showEditTable()); };
+  cd.appendChild(adjustBtn); cd.appendChild(skipBtn);
+  bub.appendChild(cd);
+  wrap.appendChild(av); wrap.appendChild(bub);
+  area.appendChild(wrap); area.scrollTop=area.scrollHeight;
+}
+
+function showLunchProposal(cutOnly) {
+  const lunchDur = parseInt(((S.lunch||'').match(/(\d+)分/)||[0,60])[1]);
+  const lunchMin1 = 12*60, lunchMin2 = 13*60+30;
+  let bestCut = null;
+  for (const cut of cutOnly) {
+    const endMin = parseTime(cut.timeE);
+    if (endMin && endMin >= lunchMin1 && endMin <= lunchMin2) { bestCut=cut; break; }
+    if (endMin && endMin > lunchMin2 && !bestCut) {
+      const idx2=cutOnly.indexOf(cut);
+      if(idx2>0) bestCut=cutOnly[idx2-1];
+      break;
+    }
+  }
+  if (!bestCut) return;
+
+  const area=document.getElementById('chatArea');
+  const wrap=mkEl('div','msg ai');
+  const av=mkEl('div','msg-av');av.textContent='AI';
+  const bub=mkEl('div','msg-bub');
+  bub.innerHTML=`🍱 <strong>${bestCut.num}</strong> 終了後（${bestCut.timeE}）にお昼休憩（${lunchDur}分）を入れることを提案します。どうしますか？`;
+
+  const cd=mkEl('div','chips');cd.style.marginTop='8px';
+
+  const yesBtn=mkEl('button','chip');
+  yesBtn.textContent=`✅ ${bestCut.num}の後にお昼を入れる`;
+  yesBtn.style.cssText='background:var(--g);color:#fff;border-color:var(--gd)';
+  yesBtn.onclick=()=>{
+    S.lunchCutoff=bestCut.num;
+    S._lunchCutoffFixed=true;
+    S.scheduleRows=[];
+    addUser(`${bestCut.num}の後にお昼を入れる`);
+    typing(()=>{ buildSceneSchedule(); setTimeout(()=>checkOvertime(),500); });
+  };
+
+  const changeBtn=mkEl('button','chip');
+  changeBtn.textContent='✏️ 別の区切りを選ぶ';
+  changeBtn.onclick=()=>{
+    addUser('別の区切りを選ぶ');
+    S._lunchCutoffFixed=false;
+    S._afterLunchAction='showEditTable'; // 選択後はスケジュール表へ
+    typing(()=>askLunchCutoffForAI(cutOnly));
+  };
+
+  const noBtn=mkEl('button','chip');
+  noBtn.textContent='お昼なしで進む';
+  noBtn.onclick=()=>{
+    S.lunchCutoff='none';
+    S._lunchCutoffFixed=true;
+    S.lunch='なし';
+    S.scheduleRows=[];
+    addUser('お昼なしで進む');
+    typing(()=>{ buildSceneSchedule(); setTimeout(()=>checkOvertime(),500); });
+  };
+
+  cd.appendChild(yesBtn);cd.appendChild(changeBtn);cd.appendChild(noBtn);
+  bub.appendChild(cd);
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+}
+
+
+function askMoreScenes() {
+  activeStep=5;
+  const area=document.getElementById('chatArea');
+  const wrap=mkEl('div','msg ai wide');
+  const av=mkEl('div','msg-av');av.textContent='AI';
+  const bub=mkEl('div','msg-bub');
+  const startIdx=S.scenes.length;
+  bub.innerHTML=`追加するシーンを入力してください。<br><span style="font-size:12px;color:var(--mt)">C${String(startIdx+1).padStart(2,'0')}から番号が続きます</span>`;
+
+  const inputList=document.createElement('div');
+  inputList.style.cssText='display:flex;flex-direction:column;gap:6px;margin-top:10px';
+
+  function addRow(val='') {
+    const idx=startIdx+inputList.children.length+1;
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;gap:6px;align-items:center';
+    const num=document.createElement('span');
+    num.style.cssText='font-size:12px;color:var(--g);font-weight:700;min-width:28px;font-family:"DM Mono",monospace';
+    num.textContent=`C${String(idx).padStart(2,'0')}`;
+    const inp=document.createElement('input');
+    inp.type='text';inp.className='ci more-content-inp';
+    inp.placeholder='追加シーンを入力';inp.value=val;
+    inp.style.cssText='flex:1;padding:7px 10px;font-size:13px';
+    inp.addEventListener('keydown',e=>{
+      if(e.key==='Enter'){e.preventDefault();addRow();
+        const rows=inputList.querySelectorAll('input.more-content-inp');
+        rows[rows.length-1].focus();
+      }
+    });
+    const locInp2=document.createElement('input');
+    locInp2.type='text';locInp2.className='ci more-loc-inp';
+    locInp2.placeholder='撮影場所（任意）';
+    locInp2.style.cssText='width:130px;padding:7px 10px;font-size:12px;flex-shrink:0';
+    const delBtn=document.createElement('button');
+    delBtn.textContent='✕';
+    delBtn.style.cssText='padding:5px 9px;background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5;border-radius:4px;font-size:12px;cursor:pointer;flex-shrink:0';
+    delBtn.onclick=()=>row.remove();
+    row.appendChild(num);row.appendChild(inp);row.appendChild(locInp2);row.appendChild(delBtn);
+    inputList.appendChild(row);inp.focus();
+  }
+  addRow();
+  bub.appendChild(inputList);
+
+  const addBtn=mkEl('button','add-btn');addBtn.textContent='＋ 行を追加';addBtn.style.marginTop='8px';
+  addBtn.onclick=()=>addRow();
+  bub.appendChild(addBtn);
+
+  const confBtn=mkEl('button','confirm-btn');confBtn.textContent='✅ 確定する';confBtn.style.marginTop='10px';
+  confBtn.onclick=()=>{
+    const vals=[...inputList.querySelectorAll('input')].map(i=>i.value.trim()).filter(Boolean);
+    if(!vals.length){toast('シーンを入力してください','err');return;}
+    confBtn.disabled=true;
+    addUser(vals.map((v,i)=>`C${String(startIdx+i+1).padStart(2,'0')}：${v}`).join('　'));
+    // S.scenes に push
+    const moreContents=[...inputList.querySelectorAll('input.more-content-inp')].map(i=>i.value.trim()).filter(Boolean);
+    const moreLocs=[...inputList.querySelectorAll('input.more-loc-inp')];
+    moreContents.forEach((content,i)=>{
+      S.scenes.push({
+        num:`C${String(startIdx+i+1).padStart(2,'0')}`,
+        content,
+        location:moreLocs[i]?.value.trim()||'',
+        type:'スチール',
+        cam:'1カメ', durationMin:0,
+      });
+    });
+    typing(()=>askMoreOrProceed());
+  };
+  bub.appendChild(confBtn);
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+  pendingKey='sceneMore';waitText=false;
+  document.getElementById('txtIn').disabled=true;
+  document.getElementById('txtIn').placeholder='← 上のフォームにシーンを入力してください';
+  updateUI();
+}
+
+function askCutsManual() {
+  activeStep=5;
+  waitText=true; pendingKey='cutsTotal';
+  addAI('合計カット数を教えてください。\n（例：スチール3カット・動画6カット など）', null, 'cutsTotal', '例：スチール3カット、動画6カット');
+}
+
+// ── コンテガイド ──────────────────────────────────────────────────────────────
+function showConteGuide() {
+  const area = document.getElementById('chatArea');
+  const wrap = mkEl('div','msg ai');
+  const av = mkEl('div','msg-av'); av.textContent='AI';
+  const bub = mkEl('div','msg-bub');
+  bub.innerHTML = 'コンテの解析はClaudeチャットと連携します。';
+  const box = mkEl('div','conte-box');
+  box.innerHTML = `<div class="conte-box-t">📋 手順</div><ol><li>このチャット画面の入力欄にコンテ画像を添付して送信</li><li>「カット番号・時間・内容・カメラ台数・担当キャストを一覧にしてください」と送信</li><li>Claudeの返答を下のテキストエリアに貼り付け</li><li>「取り込む」をクリック</li></ol>`;
+  const ta = mkEl('textarea','paste-area'); ta.id='conteTA';
+  ta.placeholder='例：\nC01 9:00〜10:00 ねこAがくつろいでいるシーン 1カメ\nC02 9:00〜10:00 ねこAが遊んでいるシーン 1カメ\nC03 10:15〜12:30 ねこAが食器で食べているシーン〜食べ終わるシーン 2カメ同時';
+  const btn = mkEl('button','paste-btn'); btn.textContent='✅ 取り込む';
+  btn.onclick = ()=>parseConte(ta.value);
+  const skip = mkEl('div','chips'); skip.style.marginTop='8px';
+  const skipBtn = mkEl('button','chip'); skipBtn.textContent='✏️ 手入力する';
+  skipBtn.onclick = ()=>{ addUser('手入力する'); typing(()=>askCutsManual()); };
+  skip.appendChild(skipBtn);
+  bub.appendChild(box); bub.appendChild(ta); bub.appendChild(btn); bub.appendChild(skip);
+  wrap.appendChild(av); wrap.appendChild(bub);
+  area.appendChild(wrap); area.scrollTop=area.scrollHeight;
+}
+
+function parseConte(raw) {
+  if (!raw.trim()) { toast('テキストが空です','err'); return; }
+  const lines = raw.trim().split('\n').filter(l=>l.trim());
+  const cuts = [];
+  lines.forEach(line=>{
+    const isVideo = line.includes('動画')||/video/i.test(line);
+    const num = (line.match(/[Cc]\d+[A-Za-z]?/)||[])[0]?.toUpperCase()||`C${String(cuts.length+1).padStart(2,'0')}`;
+    const {t1,t2} = extractTimes(line);
+    let content = line.replace(/[Cc]\d+[A-Za-z]?\s*/,'').replace(/スチール|動画/gi,'').replace(/\d{1,2}:\d{2}[〜～\-]\d{1,2}:\d{2}/g,'').trim();
+    const camMatch = content.match(/(2カメ同時|2カメ|1カメ)/);
+    const cam = camMatch?camMatch[1]:'1カメ';
+    if (camMatch) content = content.replace(camMatch[0],'').trim();
+    const noteMatch = content.match(/\s+(テロップ.{0,30})$/);
+    const note = noteMatch?noteMatch[1].trim():'';
+    if (noteMatch) content = content.replace(noteMatch[0],'').trim();
+    cuts.push({row_type:'cut',num,timeS:t1,timeE:t2,content:content||'（内容未記入）',type:isVideo?'動画':'スチール',cam,location:'',note});
+  });
+  if (!cuts.length) { toast('カット情報を読み取れませんでした','err'); return; }
+  // cutsData を scenes に変換してシーンフローへ
+  S.scenes = cuts.map(cut=>({
+    num: cut.num,
+    content: cut.content,
+    location: cut.location||'',
+    type: cut.type||'スチール',
+    cam: cut.cam||'1カメ',
+    durationMin: estimateDuration(cut.content),
+  }));
+  S.title = S.title||'撮影';
+  addUser(`コンテ貼り付け完了（${cuts.length}カット）`);
+  // シーン確認→グループ化→お昼→時間入力のフローへ
+  typing(()=>askMoreOrProceed(), 400);
+}
+
+function makeDummyCuts(desc) {
+  // テキストからカット数を抽出してダミー生成
+  const nums = desc.match(/\d+/g)||[];
+  const total = nums.reduce((s,n)=>s+parseInt(n),0)||4;
+  const isVideo = desc.includes('動画');
+  return Array.from({length:total},(_,i)=>({
+    row_type:'cut', num:`C${String(i+1).padStart(2,'0')}`,
+    timeS:'', timeE:'', content:'', type:isVideo?'動画':'スチール', cam:'1カメ', note:''
+  }));
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SCHEDULE ROW BUILDER
+// ══════════════════════════════════════════════════════════════════════════════
+function buildRows() {
+  const rows = [];
+  const staffIn = S.shootStart ? (offsetTime(S.shootStart,-60)||S.shootStart) : '';
+  const defaultIn30 = S.shootStart ? (offsetTime(S.shootStart,-30)||S.shootStart) : '';
+  const clientComes = !!(S.client && (S.client.includes('来場')||S.client==='あり'));
+  // IN/OUTが未設定なら強制設定
+  if(clientComes){ if(!S.clientTime||S.clientTime==='') S.clientTime=defaultIn30; }
+  S.casts.forEach(cast=>{
+    if(!cast.inTime||cast.inTime==='') cast.inTime=defaultIn30;
+    if(!cast.outTime||cast.outTime==='') cast.outTime=S.shootEnd||'';
+  });
+
+  // スタッフイン
+  rows.push({row_type:'staff_in', timeS:staffIn, timeE:'', content:'制作・撮影スタッフ 現場入り', cam:'', note:''});
+
+
+  // クライアントイン（撮影開始30分前を常に自動計算）
+  const clientComes2 = clientComes; // 上で定義済み
+  if (clientComes2) {
+    const ct = offsetTime(S.shootStart,-30)||defaultIn30;
+    rows.push({row_type:'client_in', timeS:ct, timeE:'', content:'クライアント 現場入り', cam:'', note:''});
+  }
+
+  // キャストイン/アウト（S.cutsDataから毎回動的計算）
+  S.casts.forEach(cast=>{
+    // S.casts[].inTimeが手動設定済みならそれを優先、未設定ならcutsDataから計算
+    const hasManualIn  = cast.inTime  && cast.inTime  !== '' && cast.inTime  !== 'undefined';
+    const hasManualOut = cast.outTime && cast.outTime !== '' && cast.outTime !== 'undefined';
+
+    let castInTime  = hasManualIn  ? cast.inTime  : defaultIn30;
+    let castOutTime = hasManualOut ? cast.outTime : (S.shootEnd||'');
+
+    // 手動設定がない場合のみcutsDataから推定
+    if ((!hasManualIn || !hasManualOut) && S.cutsData && S.cutsData.length) {
+      const castCuts = S.cutsData.filter(r=>{
+        if (r.row_type!=='cut') return false;
+        const rc = r.cast||''; const cn = cast.name||'';
+        return rc.includes(cn)||cn.includes(rc)||
+          rc.split(/[・、,\s]+/).some(n=>n&&cn.includes(n))||
+          cn.split(/[・、,\s]+/).some(n=>n&&rc.includes(n));
+      });
+      if (castCuts.length) {
+        if (!hasManualIn  && castCuts[0].timeS)
+          castInTime  = offsetTime(castCuts[0].timeS,-30)||defaultIn30;
+        if (!hasManualOut && castCuts[castCuts.length-1].timeE)
+          castOutTime = offsetTime(castCuts[castCuts.length-1].timeE,30)||S.shootEnd||'';
+      }
+    }
+
+    rows.push({
+      row_type:'model_in',
+      timeS: castInTime,
+      timeE: '',
+      content: `${cast.name} 現場入り`,
+      cam:'',
+      note: castOutTime ? `OUT ${castOutTime}` : ''
+    });
+  });
+
+
+  // 撮影開始
+  rows.push({row_type:'shoot_start', timeS:S.shootStart, timeE:'', content:'★ 撮影開始', cam:'', note:''});
+
+  // 移動行挿入ヘルパー
+  const insertMoveAfter = (rows, cutNum) => {
+    if (!S.moves || !S.moves.length) return;
+    S.moves.forEach(move=>{
+      if (move.afterCut && move.afterCut.includes(cutNum)) {
+        rows.push({
+          row_type:'move',
+          timeS:'', timeE:'',
+          content:`移動${move.destination ? '：'+move.destination : ''}（${move.durationMin}分）`,
+          num:'', type:'', cam:'', note:move.destination||''
+        });
+      }
+    });
+  };
+
+  // カット行を挿入
+  // シーンフローで生成した場合はbreak行が既にcutsDataに含まれているのでlunchは挿入しない
+  // S.cutsDataにbreak行がある場合はbuildSceneScheduleで既に挿入済み→スキップ
+  const alreadyHasLunch = S.cutsData.some(r=>r.row_type==='break');
+  // S.lunch = "12:30〜60分" → lunchStart="12:30"、「60分」のみの場合はnull
+  const lunchParts = (S.lunch&&S.lunch!=='なし') ? S.lunch.split('〜') : [];
+  const lunchStart = lunchParts.length>1 ? lunchParts[0] : null;
+  const lunchMin = lunchStart ? parseTime(lunchStart) : null;
+
+  let insertedLunch = alreadyHasLunch;
+  const lunchCutoffNum = S.lunchCutoff && S.lunchCutoff!=='all' && S.lunchCutoff!=='none'
+    ? S.lunchCutoff : null;
+
+  S.cutsData.forEach((cut,i)=>{
+    rows.push({...cut});
+
+    // lunchCutoffベースで挿入（カット番号が一致したら次のカットの前に）
+    if (!insertedLunch && S.lunch && S.lunch!=='なし') {
+      if (lunchCutoffNum && cut.row_type==='cut' && cut.num===lunchCutoffNum) {
+        // このカットの直後にお昼を挿入
+        insertLunch(rows, cut.timeE||'');
+        insertedLunch = true;
+      } else if (!lunchCutoffNum && lunchMin) {
+        // 時刻ベースでフォールバック
+        const nextCut = S.cutsData[i+1];
+        if (nextCut && parseTime(nextCut.timeS) >= lunchMin) {
+          const prevCut2 = [...rows].filter(r=>r.row_type==='cut').slice(-1)[0];
+          insertLunch(rows, prevCut2?.timeE||'');
+          insertedLunch = true;
+        }
+      }
+    }
+  });
+
+  // 全カット後にもお昼が未挿入なら最後に追加
+  if (!insertedLunch && S.lunch && S.lunch!=='なし' && S.lunchCutoff!=='none') {
+    const prevCut=[...rows].reverse().find(r=>r.row_type==='cut');
+    insertLunch(rows, prevCut?.timeE||'');
+  }
+
+  // キャストアウト
+  S.casts.filter(c=>c.outTime).forEach(cast=>{
+    rows.push({row_type:'model_out', timeS:cast.outTime, timeE:'', content:`${cast.name} OUT`, cam:'', note:''});
+  });
+
+  // 撮影終了
+  rows.push({row_type:'shoot_end', timeS:S.shootEnd, timeE:'', content:'撮影終了（クランクアップ）', cam:'', note:''});
+
+  // 完全撤収
+  rows.push({row_type:'wrap_up', timeS:S.wrapUp, timeE:'', content:'完全撤収', cam:'', note:''});
+
+  return rows;
+}
+
+function insertLunch(rows, startTime) {
+  // startTime: "12:30" など（buildRows から渡す）
+  const durMatch = S.lunch ? S.lunch.match(/(\d+)分/) : null;
+  const lunchDur = durMatch ? parseInt(durMatch[1]) : 60;
+  const lunchEnd = startTime ? offsetTime(startTime, lunchDur) : '';
+  rows.push({row_type:'break', timeS:startTime||'', timeE:lunchEnd, content:`昼休憩・準備（${lunchDur}分）`, cam:'', note:''});
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EDIT TABLE
+// ══════════════════════════════════════════════════════════════════════════════
+const RT_META = {
+  staff_in:   {label:'👥 スタッフイン',    showType:false, showCam:false},
+  client_in:  {label:'🤝 クライアントイン',showType:false, showCam:false},
+  model_in:   {label:'🐾 キャストイン',    showType:false, showCam:false},
+  model_out:  {label:'🐾 キャストアウト',  showType:false, showCam:false},
+  set_change: {label:'▸ セットチェンジ',   showType:false, showCam:false},
+  break:      {label:'🍱 休憩',            showType:false, showCam:false},
+  shoot_start:{label:'★ 撮影開始',         showType:false, showCam:false},
+  shoot_end:  {label:'🎬 撮影終了',         showType:false, showCam:false},
+  wrap_up:    {label:'🏁 完全撤収',         showType:false, showCam:false},
+  move:       {label:'🚗 移動',             showType:false, showCam:false},
+  cut:        {label:'',                   showType:false, showCam:false, showLoc:true},
+};
+
+
+function findNearestTime(timeStr) {
+  const t = parseTime(timeStr);
+  if (t == null) return '';
+  // 15分刻みに丸める
+  const rounded = Math.round(t / 15) * 15;
+  return minToStr(rounded);
+}
+
+function makeRow(d) {
+  const rt = d.row_type||'cut';
+  const meta = RT_META[rt]||RT_META.cut;
+  const tr = document.createElement('tr');
+  tr.dataset.rt = rt;
+
+  // drag handle
+  const hTd=mkEl('td','drag-h'); hTd.textContent='☰';
+  tr.setAttribute('draggable','false');
+  // makeDraggableはinitDrag内で設定
+  tr.appendChild(hTd);
+
+  // No / type badge
+  const noTd=mkEl('td',''); noTd.style.cssText='width:74px;white-space:nowrap';
+  if (rt==='cut') {
+    noTd.innerHTML=`<input class="ci ci-num" value="${d.num||''}" placeholder="C01" style="width:56px">`;
+  } else {
+    noTd.innerHTML=`<span class="rt-badge">${meta.label}</span>`;
+  }
+  tr.appendChild(noTd);
+
+  // time
+  const tTd=mkEl('td',''); tTd.style.cssText='white-space:nowrap;width:152px';
+  tTd.innerHTML=`<select class="ci-sel ci-ts" style="width:68px">${mkTOpts(d.timeS||'')}</select><span style="color:var(--mt);font-size:10px;margin:0 2px">〜</span><select class="ci-sel ci-te" style="width:68px">${mkTOpts(d.timeE||'')}</select>`;
+  tr.appendChild(tTd);
+
+  // content
+  const cTd=mkEl('td',''); cTd.style.minWidth='160px';
+  cTd.innerHTML=`<input class="ci ci-content" value="${(d.content||'').replace(/"/g,'&quot;')}" placeholder="${rt==='cut'?'内容':'内容'}" style="width:100%">`;
+  tr.appendChild(cTd);
+
+  // 種別・カメラは非表示のためtd自体を追加しない
+
+  // 場所 (カット行のみ)
+  const locTd2=mkEl('td',''); locTd2.style.width='100px';
+  if (meta.showLoc) locTd2.innerHTML=`<input class="ci ci-loc" value="${(d.location||'').replace(/"/g,'&quot;')}" placeholder="撮影場所" style="width:100%">`;
+  tr.appendChild(locTd2);
+
+  // キャスト (カット行のみ)
+  const castTd2=mkEl('td',''); castTd2.style.width='90px';
+  if (meta.showLoc) castTd2.innerHTML=`<input class="ci ci-cast" value="${(d.cast||'').replace(/"/g,'&quot;')}" placeholder="キャスト" style="width:100%">`;
+  tr.appendChild(castTd2);
+
+  // 所要時間 (カット行のみ)
+  const durTd=mkEl('td',''); durTd.style.width='100px';
+  if (meta.showLoc) {
+    const durSel2=document.createElement('select');
+    durSel2.className='ci-sel ci-dur';
+    durSel2.style.cssText='width:100%;padding:4px 6px;font-size:11.5px';
+    const durOpts=[0,15,30,45,60,75,90,120,150,180];
+    durOpts.forEach(m=>{
+      const opt=document.createElement('option');
+      opt.value=m;
+      opt.textContent=m===0?'—':m<60?m+'分':m===60?'1時間':m%60===0?(m/60)+'時間':(Math.floor(m/60))+'時間'+(m%60)+'分';
+      if((d.durationMin||0)===m) opt.selected=true;
+      durSel2.appendChild(opt);
+    });
+    durTd.appendChild(durSel2);
+  }
+  tr.appendChild(durTd);
+
+  // note
+  const nTd=mkEl('td',''); nTd.style.minWidth='120px';
+  nTd.innerHTML=`<input class="ci ci-note" value="${(d.note||'').replace(/"/g,'&quot;')}" placeholder="備考" style="width:100%">`;
+  tr.appendChild(nTd);
+
+  // delete
+  const dTd=mkEl('td',''); dTd.style.width='40px';
+  const dBtn=mkEl('button','del-btn'); dBtn.textContent='削除';
+  dBtn.onclick=()=>{ tr.remove(); setTimeout(()=>recalcTimes(), 80); };
+  dTd.appendChild(dBtn);
+  tr.appendChild(dTd);
+
+  return tr;
+}
+
+
+// ── 撮影場所でグループ化 ──────────────────────────────────────────────────
+function groupByLocation() {
+  const rows = [...document.getElementById('editBody').rows];
+  if (!rows.length) { toast('スケジュール表が空です','err'); return; }
+
+  // カット行の場所を収集（入力順）
+  const cutRows = rows.filter(r=>r.dataset.rt==='cut');
+  const locations = [];
+  const locationMap = {};
+  cutRows.forEach(tr=>{
+    const loc = tr.querySelector('.ci-loc')?.value.trim()||'（場所未設定）';
+    if (!locationMap[loc]) { locationMap[loc]=[]; locations.push(loc); }
+    locationMap[loc].push(tr);
+  });
+
+  if (locations.length <= 1) { toast('複数の撮影場所を設定してください','err'); return; }
+
+  // 既存の非カット行（スタッフイン等）を前後に保持
+  const headRows = []; // 撮影開始前
+  const tailRows = []; // 撮影終了後
+  let passedStart = false;
+  rows.forEach(tr=>{
+    const rt = tr.dataset.rt;
+    if (rt==='shoot_start') { passedStart=true; headRows.push(tr); return; }
+    if (['shoot_end','wrap_up','model_out'].includes(rt)) { tailRows.push(tr); return; }
+    if (!passedStart) headRows.push(tr);
+    // カット行と中間のスケジュール行はグループ化後に再配置
+  });
+
+  // 場所ごとにグループ化してtbodyを再構築
+  const tbody = document.getElementById('editBody');
+  // 全行をいったん削除
+  while(tbody.firstChild) tbody.removeChild(tbody.firstChild);
+
+  // ヘッダー行を戻す
+  headRows.forEach(tr=>tbody.appendChild(tr));
+
+  // 場所ごとにブロックを追加
+  locations.forEach((loc, i) => {
+    // 場所ヘッダー行（セットチェンジ）
+    if (i > 0) {
+      const scRow = makeRow({row_type:'set_change',timeS:'',timeE:'',
+        content:`セットチェンジ → ${loc}`,num:'',type:'',cam:'',note:'15分',location:''});
+      tbody.appendChild(scRow);
+    } else {
+      // 最初の場所は移動行
+      const locHeader = makeRow({row_type:'set_change',timeS:'',timeE:'',
+        content:`📍 ${loc}`,num:'',type:'',cam:'',note:'',location:''});
+      tbody.appendChild(locHeader);
+    }
+    // その場所のカット行
+    locationMap[loc].forEach(tr=>tbody.appendChild(tr));
+  });
+
+  // テールの行を戻す
+  tailRows.forEach(tr=>tbody.appendChild(tr));
+
+  toast(`${locations.length}か所の撮影場所でグループ化しました`, 'ok');
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// スケジュール表の時間再計算
+// ══════════════════════════════════════════════════════════════════════════════
+function recalcTimes() {
+  const tbody = document.getElementById('editBody');
+  if (!tbody) { toast('スケジュール表が見つかりません','err'); return; }
+
+  const rows = [...tbody.rows];
+  const startMin = parseTime(S.shootStart) || 9*60;
+  const lunchDurMin = S.lunch && S.lunch!=='なし'
+    ? parseInt((S.lunch.match(/(\d+)分/)||[0,60])[1]) : 60;
+
+  let cursor = startMin;
+
+  rows.forEach(tr => {
+    const rt = tr.dataset.rt || 'cut';
+    const tS = tr.querySelector('.ci-ts');
+    const tE = tr.querySelector('.ci-te');
+    if (!tS) return;
+
+    switch(rt) {
+      case 'staff_in':
+        // 開始1時間前に固定
+        setSelVal(tS, minToStr(startMin - 60));
+        setSelVal(tE, '');
+        break;
+
+      case 'client_in':
+        // shootStart基準で設定済みの時間はそのまま（再計算しない）
+        break;
+
+      case 'model_in':
+        // キャストインも固定（変えない）
+        break;
+
+      case 'shoot_start':
+        setSelVal(tS, S.shootStart||'');
+        setSelVal(tE, '');
+        cursor = startMin;
+        break;
+
+      case 'cut': {
+        const numEl2 = tr.querySelector('.ci-num');
+        const contentEl2 = tr.querySelector('.ci-content');
+        const durSel3 = tr.querySelector('.ci-dur');
+        const num2 = numEl2?.value.trim()||'';
+        const content2 = contentEl2?.value.trim()||'';
+        // ①テーブルのci-dur → ②S.scenes → ③estimate → ④60分
+        let useDur2 = durSel3 ? (parseInt(durSel3.value)||0) : 0;
+        if (!useDur2) {
+          const scene2 = S.scenes ? S.scenes.find(s=>s.num===num2) : null;
+          useDur2 = scene2?.durationMin || 0;
+        }
+        if (!useDur2 && content2) useDur2 = estimateDuration(content2);
+        if (!useDur2) useDur2 = 60;
+        setSelVal(tS, minToStr(cursor));
+        setSelVal(tE, minToStr(cursor + useDur2));
+        cursor += useDur2;
+        break;
+      }
+
+      case 'set_change':
+      case 'move': {
+        // 備考から分数を取得
+        const noteEl = tr.querySelector('.ci-note');
+        const noteVal = noteEl?.value || '';
+        const minMatch = noteVal.match(/(\d+)分/);
+        const dur = minMatch ? parseInt(minMatch[1]) : 15;
+        setSelVal(tS, minToStr(cursor));
+        setSelVal(tE, minToStr(cursor + dur));
+        cursor += dur;
+        break;
+      }
+
+      case 'break': {
+        setSelVal(tS, minToStr(cursor));
+        setSelVal(tE, minToStr(cursor + lunchDurMin));
+        cursor += lunchDurMin;
+        break;
+      }
+
+      case 'model_out':
+      case 'shoot_end':
+        setSelVal(tS, minToStr(cursor));
+        setSelVal(tE, '');
+        S.shootEnd = minToStr(cursor);
+        break;
+
+      case 'wrap_up':
+        // 撮影終了の30分後などに設定（現状維持or+30分）
+        const wrapMin = parseTime(S.wrapUp) || cursor + 60;
+        setSelVal(tS, minToStr(Math.max(cursor, wrapMin)));
+        setSelVal(tE, '');
+        break;
+    }
+  });
+
+  toast('時間を再計算しました ✅', 'ok');
+}
+
+function setSelVal(sel, val) {
+  if (!sel) return;
+  // select の option に value があれば選択、なければ最近傍を選ぶ
+  const opts = [...sel.options];
+  const exact = opts.find(o => o.value === val);
+  if (exact) {
+    sel.value = val;
+  } else if (val) {
+    // 最近傍の15分刻みを探す
+    const target = parseTime(val);
+    if (target != null) {
+      let closest = opts[0];
+      let minDiff = Infinity;
+      opts.forEach(o => {
+        if (!o.value) return;
+        const t = parseTime(o.value);
+        if (t != null && Math.abs(t - target) < minDiff) {
+          minDiff = Math.abs(t - target);
+          closest = o;
+        }
+      });
+      sel.value = closest.value;
+    }
+  } else {
+    sel.value = '';
+  }
+}
+
+
+function showEditTable() {
+  // S.scheduleRowsが既にある場合はそれを使う（インポート時など）
+  // ない場合はbuildRowsで新規生成
+  const rows = (S.scheduleRows && S.scheduleRows.length) ? S.scheduleRows : buildRows();
+  S.scheduleRows = rows;
+
+  // 既存のeditBodyがある場合は中身だけ差し替えてスクロール
+  const existingBody = document.getElementById('editBody');
+  if (existingBody) {
+    existingBody.innerHTML = '';
+    rows.forEach(r=>existingBody.appendChild(makeRow(r)));
+    setTimeout(()=>{
+      initDrag('editBody');
+      // テーブルを含むバブルまでスクロール
+      const tbl = existingBody.closest('.msg');
+      if (tbl) tbl.scrollIntoView({behavior:'smooth', block:'start'});
+      const area = document.getElementById('chatArea');
+      if (area) area.scrollTop = area.scrollHeight;
+    }, 80);
+    return;
+  }
+
+  const area = document.getElementById('chatArea');
+  const wrap = mkEl('div','msg ai wide');
+  const av = mkEl('div','msg-av'); av.textContent='AI';
+  const bub = mkEl('div','msg-bub');
+
+  const cutCount = rows.filter(r=>r.row_type==='cut').length;
+  bub.innerHTML = `スケジュール表が完成しました！<br><strong>${cutCount}カット</strong>を含む全<strong>${rows.length}行</strong>です。<br><span style="font-size:11.5px;color:var(--mt)">☰ をドラッグして並び替え ／ 行を追加・削除できます</span>`;
+
+  // table
+  const ew = mkEl('div','edit-wrap');
+  const tbl = mkEl('table','edit-tbl'); tbl.id='editTbl';
+  tbl.innerHTML=`<thead><tr><th style="width:22px"></th><th style="width:74px">No./種別</th><th style="width:152px">時間</th><th style="width:200px">内容</th><th style="width:100px">撮影場所</th><th style="width:90px">キャスト</th><th style="width:100px">所要時間</th><th>備考</th><th style="width:40px"></th></tr></thead>`;
+  const tbody = mkEl('tbody'); tbody.id='editBody';
+  rows.forEach(r=>tbody.appendChild(makeRow(r)));
+  tbl.appendChild(tbody); ew.appendChild(tbl);
+  bub.appendChild(ew);
+
+  // add buttons
+  const addW = mkEl('div','add-btns');
+  const addDefs=[
+    {label:'＋ カット行',          rt:'cut',        content:''},
+    {label:'▸ セットチェンジ',     rt:'set_change', content:'15分'},
+    {label:'🍱 休憩',              rt:'break',      content:''},
+    {label:'🐾 キャストイン',      rt:'model_in',   content:''},
+    {label:'🐾 キャストアウト',    rt:'model_out',  content:''},
+    {label:'🚗 移動',              rt:'move',       content:'移動'},
+    {label:'👥 スタッフイン',      rt:'staff_in',   content:'スタッフ現場入り'},
+    {label:'🤝 クライアントイン',  rt:'client_in',  content:'クライアント現場入り'},
+  ];
+  addDefs.forEach(def=>{
+    const btn=mkEl('button','add-btn'); btn.textContent=def.label;
+    btn.onclick=()=>{
+      document.getElementById('editBody').appendChild(
+        makeRow({row_type:def.rt,timeS:'',timeE:'',content:def.content,num:'',type:'スチール',cam:'1カメ',note:''})
+      );
+    };
+    addW.appendChild(btn);
+  });
+  bub.appendChild(addW);
+
+  const groupBtn=mkEl('button','');
+  groupBtn.textContent='📍 撮影場所でグループ化';
+  groupBtn.style.cssText='margin-top:8px;margin-right:8px;padding:8px 14px;background:#F0F8FF;color:#185FA5;border:1px solid #B3D4F0;border-radius:var(--rs);font-family:"Noto Sans JP",sans-serif;font-size:12.5px;font-weight:600;cursor:pointer';
+  groupBtn.onclick=()=>groupByLocation();
+  bub.appendChild(groupBtn);
+
+  const recalcBtn=mkEl('button','');
+  recalcBtn.textContent='🔄 時間を再計算する';
+  recalcBtn.style.cssText='margin-right:8px;padding:9px 16px;background:#F0F8FF;color:var(--b);border:1.5px solid var(--bl);border-radius:var(--rs);font-family:"Noto Sans JP",sans-serif;font-size:12.5px;font-weight:600;cursor:pointer';
+  recalcBtn.onclick=()=>recalcTimes();
+  bub.appendChild(recalcBtn);
+
+  const confBtn=mkEl('button','confirm-btn'); confBtn.textContent='✅ この内容で確定する';
+  confBtn.onclick=confirmEdit;
+  bub.appendChild(confBtn);
+
+  wrap.appendChild(av); wrap.appendChild(bub);
+  area.appendChild(wrap); area.scrollTop=area.scrollHeight;
+
+  setTimeout(()=>initDrag('editBody'), 80);
+
+  // やり直しボタンを独立したチップとして追加
+  setTimeout(()=>{
+    const rw=mkEl('div',''); rw.style.cssText='padding:4px 0 8px 0';
+    const restartBtn=mkEl('button','chip');
+    restartBtn.textContent='🔄 最初からやり直す';
+    restartBtn.style.cssText='background:#fff;color:var(--mt);border-color:var(--bd)';
+    restartBtn.onclick=()=>{
+      Object.keys(S).forEach(k=>{ S[k]=Array.isArray(S[k])?[]:typeof S[k]==='number'?0:''; });
+      S.casts=[];S.scenes=[];S.cutsData=[];S.scheduleRows=[];
+      document.getElementById('chatArea').innerHTML='';
+      document.getElementById('sbSumArea').style.display='block';
+      document.getElementById('sbEditArea').style.display='none';
+      document.getElementById('btnRegen').style.display='none';
+      document.getElementById('btnXlsx').disabled=true;
+      document.getElementById('btnPptL').disabled=true;
+      document.getElementById('btnPptP').disabled=true;
+      activeStep=0; updateSummary();
+      typing(()=>showBriefForm());
+    };
+    rw.appendChild(restartBtn);
+    area.appendChild(rw);
+    area.scrollTop=area.scrollHeight;
+  }, 100);
+}
+
+// ── Drag & Drop ──────────────────────────────────────────────────────────────
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 共通ドラッグ関数（mousedownベース）
+// ══════════════════════════════════════════════════════════════════════════════
+function makeDraggable(hTd, tr, getTbody) {
+  hTd.style.cursor = 'grab';
+  hTd.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const tbody = getTbody();
+    if (!tbody) return;
+    let dragging = tr;
+    dragging.style.opacity = '.5';
+    document.body.style.userSelect = 'none';
+
+    function onMove(ev) {
+      dragging.style.pointerEvents = 'none';
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      dragging.style.pointerEvents = '';
+      const overTr = el ? el.closest('tr') : null;
+      tbody.querySelectorAll('tr').forEach(r => r.classList.remove('dov-top','dov-bot'));
+      if (overTr && overTr !== dragging && overTr.closest('tbody') === tbody) {
+        const rect = overTr.getBoundingClientRect();
+        if (ev.clientY < rect.top + rect.height / 2) {
+          overTr.classList.add('dov-top');
+          tbody.insertBefore(dragging, overTr);
+        } else {
+          overTr.classList.add('dov-bot');
+          overTr.after(dragging);
+        }
+      }
+    }
+    function onUp() {
+      if (dragging) { dragging.style.opacity = '1'; dragging = null; }
+      document.body.style.userSelect = '';
+      tbody.querySelectorAll('tr').forEach(r => r.classList.remove('dov-top','dov-bot'));
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
+function initDrag(tbodyId) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  // 各行のdrag-hにmakeDraggableを設定
+  [...tbody.rows].forEach(tr => {
+    const hTd = tr.querySelector('.drag-h');
+    if (hTd && !hTd.dataset.dragInit) {
+      hTd.dataset.dragInit = '1';
+      makeDraggable(hTd, tr, () => document.getElementById(tbodyId));
+    }
+  });
+}
+
+// ── Confirm ──────────────────────────────────────────────────────────────────
+function confirmEdit() {
+  const rows=[...document.getElementById('editBody').rows];
+  S.scheduleRows=rows.map(tr=>{
+    const rt=tr.dataset.rt||'cut';
+    const tS=tr.querySelector('.ci-ts')?.value||'';
+    const tE=tr.querySelector('.ci-te')?.value||'';
+    return {
+      row_type:rt,
+      timeS:tS, timeE:tE,
+      num:tr.querySelector('.ci-num')?.value.trim()||'',
+      content:tr.querySelector('.ci-content')?.value.trim()||'',
+      type:tr.querySelector('.ci-type')?.value||'',
+      cam:tr.querySelector('.ci-cam')?.value||'',
+      location:tr.querySelector('.ci-loc')?.value.trim()||'',
+      cast:tr.querySelector('.ci-cast')?.value.trim()||'',
+      durationMin:parseInt(tr.querySelector('.ci-dur')?.value||0)||0,
+      note:tr.querySelector('.ci-note')?.value.trim()||'',
+    };
+  });
+  const cutCount=S.scheduleRows.filter(r=>r.row_type==='cut'&&(r.num||r.content)).length;
+  S.cutsTotal=`${cutCount}カット`;
+  updateSummary();
+  addUser(`${cutCount}カットで確定`);
+  typing(()=>showFinal());
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// サイドバー編集パネル
+// ══════════════════════════════════════════════════════════════════════════════
+
+function makeSchedulePanel() {
+  // シンプルなpanelとして作成（onchangeでS即時更新、再生成ボタンで反映）
+  const panel = mkEl('div','sb-panel');
+  const hd = mkEl('div','sb-panel-hd');
+  hd.innerHTML = `<span class="sb-panel-title">スケジュール</span>`;
+  panel.appendChild(hd);
+
+  const fields = [
+    {label:'撮影開始', key:'shootStart', type:'timesel'},
+    {label:'昼休憩', key:'lunch', type:'select', opts:['45分','60分','休憩なし']},
+    {label:'撮影終了', key:'shootEnd', type:'timesel'},
+    {label:'完全撤収', key:'wrapUp', type:'timesel'},
+  ];
+  fields.forEach(f => {
+    const fd = mkEl('div','sb-field');
+    const lbl = mkEl('div','sb-field-label'); lbl.textContent = f.label;
+    fd.appendChild(lbl);
+    let inp;
+    if (f.type === 'select') {
+      inp = mkEl('select','sb-sel');
+      f.opts.forEach(o=>{ const opt=document.createElement('option');opt.value=o;opt.textContent=o;if(S[f.key]===o)opt.selected=true;inp.appendChild(opt); });
+    } else {
+      inp = mkEl('select','sb-sel');
+      TIME_OPTS.forEach(t=>{ const opt=document.createElement('option');opt.value=t;opt.textContent=t||'—';if(S[f.key]===t)opt.selected=true;inp.appendChild(opt); });
+    }
+    // onchangeで即座にSに反映
+    inp.addEventListener('change', ()=>{ S[f.key]=inp.value; });
+    fd.appendChild(inp);
+    panel.appendChild(fd);
+  });
+
+  const hint2=mkEl('div','');
+  hint2.style.cssText='font-size:10.5px;color:var(--mt);margin-top:4px;line-height:1.5';
+  hint2.textContent='変更後は「スケジュール表を再生成」で反映されます';
+  panel.appendChild(hint2);
+  return panel;
+}
+
+// ── 全体の時間をずらす ────────────────────────────────────────────────────
+function shiftAllTimes(newStartTime) {
+  const oldStart = S.shootStart;
+  if (!oldStart || !newStartTime || oldStart === newStartTime) return;
+
+  const oldMin = parseTime(oldStart);
+  const newMin = parseTime(newStartTime);
+  if (oldMin == null || newMin == null) return;
+  const diff = newMin - oldMin;
+
+  S.shootStart = newStartTime;
+
+  // scheduleRows の時間をすべてずらす
+  if (S.scheduleRows && S.scheduleRows.length) {
+    S.scheduleRows = S.scheduleRows.map(row => {
+      const newRow = {...row};
+      if (row.timeS) {
+        const t = parseTime(row.timeS);
+        if (t != null) newRow.timeS = minToStr(Math.max(0, t + diff));
+      }
+      if (row.timeE) {
+        const t = parseTime(row.timeE);
+        if (t != null) newRow.timeE = minToStr(Math.max(0, t + diff));
+      }
+      return newRow;
+    });
+  }
+
+  // cutsData の時間もずらす
+  if (S.cutsData && S.cutsData.length) {
+    S.cutsData = S.cutsData.map(row => {
+      const newRow = {...row};
+      if (row.timeS) { const t=parseTime(row.timeS); if(t!=null) newRow.timeS=minToStr(Math.max(0,t+diff)); }
+      if (row.timeE) { const t=parseTime(row.timeE); if(t!=null) newRow.timeE=minToStr(Math.max(0,t+diff)); }
+      return newRow;
+    });
+  }
+
+  // shootEnd / wrapUp も自動調整
+  if (S.shootEnd) { const t=parseTime(S.shootEnd); if(t!=null) S.shootEnd=minToStr(Math.max(0,t+diff)); }
+  if (S.wrapUp)   { const t=parseTime(S.wrapUp);   if(t!=null) S.wrapUp=minToStr(Math.max(0,t+diff)); }
+
+  S.staffIn = offsetTime(S.shootStart, -60);
+
+  // ── 画面上の編集テーブルのセレクトも直接更新 ──────────────────────────
+  const tbody = document.getElementById('editBody');
+  if (tbody) {
+    [...tbody.rows].forEach(tr => {
+      const tS = tr.querySelector('.ci-ts');
+      const tE = tr.querySelector('.ci-te');
+      if (tS && tS.value) {
+        const t = parseTime(tS.value);
+        if (t != null) setSelVal(tS, minToStr(Math.max(0, t + diff)));
+      }
+      if (tE && tE.value) {
+        const t = parseTime(tE.value);
+        if (t != null) setSelVal(tE, minToStr(Math.max(0, t + diff)));
+      }
+    });
+    // 再計算も実行
+    recalcTimes();
+    toast('時間をずらしました ✅', 'ok');
+  }
+}
+
+function renderEditPanels() {
+  const area = document.getElementById('sbEditArea');
+  area.innerHTML = '';
+
+  // ── 基本情報パネル ──────────────────────────────────────────────────────
+  area.appendChild(makePanel('基本情報', [
+    {label:'タイトル', key:'title', type:'text'},
+    {label:'日時・場所', key:'dateplace', type:'text'},
+    {label:'撮影場所', key:'location', type:'select', opts:['🏢 スタジオ撮影','🌿 ロケ撮影','🏢🌿 スタジオ＋ロケ']},
+  ]));
+
+  // ── スケジュールパネル ──────────────────────────────────────────────────
+  area.appendChild(makePanel('スケジュール', [
+    {label:'撮影開始', key:'shootStart', type:'timesel'},
+    {label:'昼休憩', key:'lunch', type:'select', opts:['45分','60分','休憩なし']},
+    {label:'撮影終了', key:'shootEnd', type:'timesel'},
+    {label:'完全撤収', key:'wrapUp', type:'timesel'},
+  ]));
+
+  // ── クライアントパネル ──────────────────────────────────────────────────
+  area.appendChild(makePanel('クライアント', [
+    {label:'来場', key:'client', type:'select', opts:['来場する','来場しない','未定']},
+    {label:'来場時間', key:'clientTime', type:'timesel'},
+  ]));
+
+  // ── キャストパネル ──────────────────────────────────────────────────────
+  area.appendChild(makeCastPanel());
+}
+
+function makePanel(title, fields) {
+  const panel = mkEl('div','sb-panel');
+  const hd = mkEl('div','sb-panel-hd');
+  hd.innerHTML = `<span class="sb-panel-title">${title}</span>`;
+  panel.appendChild(hd);
+
+  // フィールド群
+  const inputs = {};
+  fields.forEach(f => {
+    const fd = mkEl('div','sb-field');
+    const lbl = mkEl('div','sb-field-label'); lbl.textContent = f.label;
+    fd.appendChild(lbl);
+
+    let inp;
+    if (f.type === 'text') {
+      inp = mkEl('input','sb-inp');
+      inp.value = S[f.key]||'';
+      inp.placeholder = f.label;
+    } else if (f.type === 'select') {
+      inp = mkEl('select','sb-sel');
+      f.opts.forEach(o=>{
+        const opt=document.createElement('option');
+        opt.value=o; opt.textContent=o;
+        if((S[f.key]||'')=== o) opt.selected=true;
+        inp.appendChild(opt);
+      });
+    } else if (f.type === 'timesel') {
+      inp = mkEl('select','sb-sel');
+      TIME_OPTS.forEach(t=>{
+        const opt=document.createElement('option');
+        opt.value=t; opt.textContent=t||'—';
+        if((S[f.key]||'')===t) opt.selected=true;
+        inp.appendChild(opt);
+      });
+    }
+    if (inp) { fd.appendChild(inp); inputs[f.key]=inp; }
+    panel.appendChild(fd);
+  });
+
+  // 各入力欄の変更を即座にSに反映（ボタン不要）
+  fields.forEach(f=>{
+    if(inputs[f.key]) {
+      inputs[f.key].addEventListener('change', ()=>{
+        S[f.key]=inputs[f.key].value;
+      });
+    }
+  });
+  // ヒントテキスト
+  const hint2=mkEl('div','');
+  hint2.style.cssText='font-size:10.5px;color:var(--mt);margin-top:4px;line-height:1.5';
+  hint2.textContent='変更後は「スケジュール表を再生成」で反映されます';
+  panel.appendChild(hint2);
+  return panel;
+}
+
+function makeCastPanel() {
+  const panel = mkEl('div','sb-panel');
+  const hd = mkEl('div','sb-panel-hd');
+  hd.innerHTML = `<span class="sb-panel-title">キャスト</span>`;
+  panel.appendChild(hd);
+
+  const list = mkEl('div','');
+  list.id = 'sbCastList';
+  renderCastList(list);
+  panel.appendChild(list);
+
+  // キャスト追加ボタン
+  const addBtn = mkEl('button','sb-edit-btn');
+  addBtn.textContent = '＋ キャストを追加';
+  addBtn.style.cssText='width:100%;padding:5px;margin-top:6px;text-align:center;border-radius:var(--rs)';
+  addBtn.onclick = () => showAddCastForm(list);
+  panel.appendChild(addBtn);
+
+  return panel;
+}
+
+function renderCastList(container) {
+  // containerがDOMから外れている場合はIDで取得
+  const el = document.getElementById('sbCastList') || container;
+  el.innerHTML = '';
+  container = el;
+  (S.casts||[]).forEach((cast, i) => {
+    const row = mkEl('div','sb-cast-row');
+    row.innerHTML = `
+      <span class="sb-cast-name">${cast.name}</span>
+      <span class="sb-cast-time">IN ${cast.inTime||'—'} ${cast.outTime?'OUT '+cast.outTime:''}</span>
+    `;
+    // 編集ボタン
+    const editBtn = mkEl('button','sb-edit-btn');
+    editBtn.textContent='✏️';
+    editBtn.onclick = () => showEditCastForm(cast, i, container);
+    // 削除ボタン
+    const delBtn = mkEl('button','');
+    delBtn.textContent='✕';
+    delBtn.style.cssText='padding:2px 6px;background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5;border-radius:4px;font-size:10px;cursor:pointer';
+    delBtn.onclick = () => { S.casts.splice(i,1); renderCastList(container); toast('削除しました'); };
+    row.appendChild(editBtn);
+    row.appendChild(delBtn);
+    container.appendChild(row);
+  });
+  if (!S.casts||!S.casts.length) {
+    const empty = mkEl('div',''); empty.style.cssText='font-size:11px;color:var(--mt);padding:6px 0';
+    empty.textContent='キャストなし';
+    container.appendChild(empty);
+  }
+}
+
+function showEditCastForm(cast, idx, container) {
+  // インライン編集フォーム
+  const existing = container.querySelector('.cast-edit-form');
+  if (existing) existing.remove();
+  const form = mkEl('div','cast-edit-form');
+  form.style.cssText='background:var(--su);border-radius:var(--rs);padding:8px;margin-top:6px;border:1px solid var(--bd)';
+
+  const mkRow=(label, el)=>{
+    const r=mkEl('div','sb-field');
+    const l=mkEl('div','sb-field-label');l.textContent=label;
+    r.appendChild(l);r.appendChild(el);return r;
+  };
+  const nameInp=mkEl('input','sb-inp');nameInp.value=cast.name||'';nameInp.placeholder='名前';
+  const inSel=mkEl('select','sb-sel');
+  const outSel=mkEl('select','sb-sel');
+  TIME_OPTS.forEach(t=>{
+    [inSel,outSel].forEach((sel,si)=>{
+      const opt=document.createElement('option');opt.value=t;opt.textContent=t||'—';
+      if(t===(si===0?cast.inTime:cast.outTime)) opt.selected=true;
+      sel.appendChild(opt);
+    });
+  });
+  form.appendChild(mkRow('名前',nameInp));
+  form.appendChild(mkRow('イン時間',inSel));
+  form.appendChild(mkRow('アウト時間',outSel));
+
+  const saveBtn=mkEl('button','sb-apply-btn');saveBtn.textContent='✅ 保存（再生成で反映）';
+  saveBtn.onclick=()=>{
+    S.casts[idx]={...cast,name:nameInp.value.trim(),inTime:inSel.value,outTime:outSel.value};
+    form.remove();
+    renderCastList(container);
+    toast('キャスト情報を更新しました','ok');
+  };
+  const cancelBtn=mkEl('button','sb-edit-btn');cancelBtn.textContent='キャンセル';
+  cancelBtn.style.cssText='margin-left:6px;padding:5px 10px';
+  cancelBtn.onclick=()=>form.remove();
+  const btns=mkEl('div','');btns.style.cssText='display:flex;gap:6px;margin-top:4px';
+  btns.appendChild(saveBtn);btns.appendChild(cancelBtn);
+  form.appendChild(btns);
+  container.appendChild(form);
+}
+
+function showAddCastForm(container) {
+  const existing = container.querySelector('.cast-edit-form');
+  if (existing) existing.remove();
+  const form = mkEl('div','cast-edit-form');
+  form.style.cssText='background:var(--su);border-radius:var(--rs);padding:8px;margin-top:6px;border:1px solid var(--bd)';
+
+  const nameInp=mkEl('input','sb-inp');nameInp.placeholder='名前 例：はるまきちゃん';
+  const kindSel=mkEl('select','sb-sel');
+  ['🐾 ペット（猫）','🐾 ペット（犬）','👤 人モデル・飼い主'].forEach(v=>{
+    const opt=document.createElement('option');opt.value=v;opt.textContent=v;kindSel.appendChild(opt);
+  });
+  const inSel=mkEl('select','sb-sel');
+  const outSel=mkEl('select','sb-sel');
+  TIME_OPTS.forEach(t=>{
+    [inSel,outSel].forEach(sel=>{
+      const opt=document.createElement('option');opt.value=t;opt.textContent=t||'—';sel.appendChild(opt);
+    });
+  });
+
+  const mkRow=(label,el)=>{const r=mkEl('div','sb-field');const l=mkEl('div','sb-field-label');l.textContent=label;r.appendChild(l);r.appendChild(el);return r;};
+  form.appendChild(mkRow('種別',kindSel));
+  form.appendChild(mkRow('名前',nameInp));
+  form.appendChild(mkRow('イン時間',inSel));
+  form.appendChild(mkRow('アウト時間',outSel));
+
+  const addBtn=mkEl('button','sb-apply-btn');addBtn.textContent='➕ 追加';
+  addBtn.onclick=()=>{
+    if(!nameInp.value.trim()){toast('名前を入力してください','err');return;}
+    S.casts.push({kind:kindSel.value,name:nameInp.value.trim(),inTime:inSel.value,outTime:outSel.value});
+    form.remove();renderCastList(container);
+    toast('キャストを追加しました','ok');
+  };
+  const cancelBtn=mkEl('button','sb-edit-btn');cancelBtn.textContent='キャンセル';
+  cancelBtn.style.cssText='margin-left:6px;padding:5px 10px';
+  cancelBtn.onclick=()=>form.remove();
+  const btns=mkEl('div','');btns.style.cssText='display:flex;gap:6px;margin-top:4px';
+  btns.appendChild(addBtn);btns.appendChild(cancelBtn);
+  form.appendChild(btns);
+  container.appendChild(form);
+}
+
+// ── 再生成ボタン ──────────────────────────────────────────────────────────
+function regenSchedule() {
+  // 現在のテーブルからカット行・移動行・休憩行を取得してS.cutsDataに同期
+  const tbody = document.getElementById('editBody');
+  if (tbody) {
+    const rows = [...tbody.rows].map(tr=>({
+      row_type: tr.dataset.rt||'cut',
+      timeS: tr.querySelector('.ci-ts')?.value||'',
+      timeE: tr.querySelector('.ci-te')?.value||'',
+      num: tr.querySelector('.ci-num')?.value.trim()||'',
+      content: tr.querySelector('.ci-content')?.value.trim()||'',
+      location: tr.querySelector('.ci-loc')?.value.trim()||'',
+      cast: tr.querySelector('.ci-cast')?.value.trim()||'',
+      durationMin: parseInt(tr.querySelector('.ci-dur')?.value||0)||0,
+      note: tr.querySelector('.ci-note')?.value.trim()||'',
+      type:'スチール', cam:'1カメ',
+    }));
+    // カット行をcutsDataに保存（move/break行は除く）
+    const cuts = rows.filter(r=>r.row_type==='cut'&&(r.num||r.content));
+    if (cuts.length) S.cutsData = cuts;
+    // S.scenesのdurationMinも同期
+    cuts.forEach(cut=>{
+      const scene = S.scenes ? S.scenes.find(s=>s.num===cut.num) : null;
+      if (scene && cut.durationMin) scene.durationMin = cut.durationMin;
+    });
+  }
+
+  // S.cutsDataから時間を積み上げ直す（buildRowsは使わない）
+  const startMin = parseTime(S.shootStart)||9*60;
+  const lunchDur = parseInt(((S.lunch||'').match(/(\d+)分/)||[0,60])[1]);
+  let cursor = startMin;
+  const newCuts = [];
+
+  (S.cutsData||[]).forEach(cut=>{
+    const dur = cut.durationMin||60;
+    cut.timeS = minToStr(cursor);
+    cut.timeE = minToStr(cursor + dur);
+    cursor += dur;
+    newCuts.push(cut);
+    // lunchCutoffのカットの後にお昼を挿入
+    if (S.lunchCutoff && S.lunchCutoff===cut.num && S.lunch && S.lunch!=='なし') {
+      const lunchStart = minToStr(cursor);
+      newCuts.push({row_type:'break',timeS:lunchStart,timeE:minToStr(cursor+lunchDur),
+        content:`昼休憩・準備（${lunchDur}分）`,num:'',type:'',cam:'',note:''});
+      cursor += lunchDur;
+    }
+    // セットチェンジ（次のカットと場所が違う場合）
+    const nextCut = (S.cutsData||[])[newCuts.filter(r=>r.row_type==='cut').length];
+    if (nextCut && nextCut.location && cut.location && nextCut.location!==cut.location) {
+      const scMin = 15;
+      newCuts.push({row_type:'set_change',timeS:minToStr(cursor),timeE:minToStr(cursor+scMin),
+        content:`移動・セットチェンジ（${scMin}分）`,num:'',type:'',cam:'',note:`${scMin}分`});
+      cursor += scMin;
+    }
+  });
+  S.cutsData = newCuts;
+
+  const schedRows = buildRows();
+  S.scheduleRows = schedRows;
+  showEditTable();
+
+  setTimeout(()=>{
+    const area = document.getElementById('chatArea');
+    const tbl = document.getElementById('editBody');
+    if (tbl && area) {
+      const bubble = tbl.closest('.msg');
+      if (bubble) area.scrollTop = bubble.offsetTop - 20;
+    }
+    toast('スケジュール表を再生成しました ✅','ok');
+  }, 200);
+}
+
+
+function showFinal() {
+  activeStep=6;
+  // 既にfinal表示済みなら出力ボタンだけ有効化して終了
+  if (document.getElementById('btnXlsx') && !document.getElementById('btnXlsx').disabled) {
+    return;
+  }
+  const area=document.getElementById('chatArea');
+  const wrap=mkEl('div','msg ai');
+  const av=mkEl('div','msg-av');av.textContent='AI';
+  const bub=mkEl('div','msg-bub');
+
+  const info=[
+    ['タイトル',S.title],['日時・場所',S.dateplace],['種別',S.medium],
+    ['場所',S.location],
+    ['移動',S.moves&&S.moves.length?S.moves.map(m=>`${m.afterCut}→${m.destination}(${m.durationMin}分)`).join('、'):''],['スタッフイン',offsetTime(S.shootStart,-60)],
+    ['撮影開始',S.shootStart],['昼休憩',S.lunch],
+    ['撮影終了',S.shootEnd],['完全撤収',S.wrapUp],
+    ['クライアント',S.client==='来場する'?`来場（${S.clientTime}）`:S.client||'—'],
+    ['カット数',S.cutsTotal||'—'],
+  ];
+  let html='🎉 <strong>香盤表の準備が完了しました！</strong><div style="background:var(--su);border-radius:8px;padding:10px 14px;font-size:12px;line-height:2;margin:8px 0">';
+  info.forEach(([k,v])=>{if(v)html+=`<div><span style="color:var(--mt);min-width:88px;display:inline-block">${k}</span><strong>${v}</strong></div>`;});
+  if(S.casts.length){
+    html+=`<div><span style="color:var(--mt);min-width:88px;display:inline-block">キャスト</span><strong>${S.casts.map(c=>`${c.name}（IN:${c.inTime||'—'}${c.outTime?'〜'+c.outTime:''}）`).join('、')}</strong></div>`;
+  }
+  html+='</div>';
+  bub.innerHTML=html;
+
+
+
+  const note=mkEl('div');note.style.cssText='font-size:12px;color:var(--mt);margin-top:10px';
+  note.textContent='← 左のボタンから出力形式を選んでください';
+  bub.appendChild(note);
+
+  wrap.appendChild(av);wrap.appendChild(bub);
+  area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+
+  document.getElementById('btnXlsx').disabled=false;
+  document.getElementById('btnPptL').disabled=false;
+  document.getElementById('btnPptP').disabled=false;
+  document.getElementById('btnRegen').style.display='flex';
+  document.getElementById('sbSumArea').style.display='none';
+  document.getElementById('sbEditArea').style.display='block';
+  renderEditPanels();
+  updateUI();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// UI
+// ══════════════════════════════════════════════════════════════════════════════
+const STEP_SEC={title:0,dateplace:0,medium:1,castCount:2,castKind:2,castName:2,castIn:2,location:3,shootStart:3,client:4,clientTime:4,lunch:3,shootEnd:3,wrapUp:3,conte:5,cutsTotal:5};
+function updateUI(){
+  const sec=STEP_SEC[pendingKey]??activeStep;
+  document.querySelectorAll('.sb-step').forEach((el,i)=>{
+    el.classList.remove('active','done');
+    if(i<sec)el.classList.add('done');
+    else if(i===sec)el.classList.add('active');
+  });
+  const pct=Math.min(100,Math.round(([S.title,S.dateplace,S.medium,S.casts.length?1:0,S.location,S.shootStart,S.client,S.lunch,S.shootEnd,S.wrapUp,S.cutsTotal].filter(Boolean).length/11)*100));
+  document.getElementById('progFill').style.width=pct+'%';
+  const hints=['タイトル入力中','撮影種別選択中','キャスト情報入力中','スケジュール入力中','クライアント確認中','カット情報入力中','確認・出力'];
+  document.getElementById('topHint').textContent=hints[sec]||'会話を進めてください';
+}
+
+function updateSummary(){
+  const rows=document.getElementById('sbRows');rows.innerHTML='';
+  const items=[
+    ['タイトル',S.title],['日時・場所',S.dateplace],['種別',S.medium],
+    ['場所',S.location],
+    ['移動',S.moves&&S.moves.length?S.moves.map(m=>`${m.afterCut}→${m.destination}(${m.durationMin}分)`).join('、'):''],['撮影開始',S.shootStart],['昼休憩',S.lunch],
+    ['撮影終了',S.shootEnd],['完全撤収',S.wrapUp],
+    ['クライアント',S.client],['カット数',S.cutsTotal],
+  ];
+  let cnt=0;
+  items.forEach(([k,v])=>{
+    if(!v)return;cnt++;
+    const r=mkEl('div','sb-row');
+    r.innerHTML=`<span class="sb-k">${k}</span><span class="sb-v">${v}</span>`;
+    rows.appendChild(r);
+  });
+  if(S.casts.length){
+    cnt++;
+    const r=mkEl('div','sb-row');
+    r.innerHTML=`<span class="sb-k">キャスト</span><span class="sb-v">${S.casts.map(c=>c.name).join('、')}</span>`;
+    rows.appendChild(r);
+  }
+  if(!cnt) rows.innerHTML='<div class="sb-empty">会話を進めると<br>ここに表示されます</div>';
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// OUTPUT
+// ══════════════════════════════════════════════════════════════════════════════
+const PC={g:'1D9E75',gd:'0F6E56',gl:'E1F5EE',b:'185FA5',bl:'E6F1FB',
+          gr:'6B6A65',su:'F6F5F1',bd:'E8E6E1',wh:'FFFFFF',tx:'18181A'};
+const ROW_BG={
+  staff_in:'EEEFFE',client_in:'FEF0EE',model_in:'E8F8F0',model_out:'FFF0F0',
+  set_change:'FEFCE8',break:'FFE8E8',shoot_start:'E8F8F0',shoot_end:'F0F0FF',wrap_up:'F0F0FF',
+  move:'E8F0FE',
+  cut_still:'E1F5EE',cut_video:'E6F1FB',
+};
+const ROW_LABEL={
+  staff_in:'👥 スタッフイン',client_in:'🤝 クライアントイン',model_in:'🐾 キャストイン',
+  model_out:'🐾 キャストアウト',set_change:'▸ セットチェンジ',break:'🍱 休憩',
+  shoot_start:'★ 撮影開始',shoot_end:'🎬 撮影終了',wrap_up:'🏁 完全撤収',
+  move:'🚗 移動',
+};
+
+function getRows() {
+  return S.scheduleRows.length ? S.scheduleRows : buildRows();
+}
+
+async function genOutput(type) {
+  const ids={xlsx:'btnXlsx',pptL:'btnPptL',pptP:'btnPptP'};
+  const labels={xlsx:'📊 Excel（.xlsx）',pptL:'⬜ PowerPoint 横向き',pptP:'📄 PowerPoint 縦向き'};
+  const btn=document.getElementById(ids[type]);
+  btn.disabled=true;btn.textContent='⏳ 生成中...';
+  try {
+    const rows=getRows();
+    if (type==='xlsx') await genXlsx(rows);
+    else if (type==='pptL') await genPptx(rows,'l');
+    else await genPptx(rows,'p');
+    toast('生成完了！','ok');
+  } catch(e) {
+    console.error(e);toast('エラー: '+e.message,'err');
+  } finally {
+    btn.disabled=false;btn.textContent=labels[type];
+  }
+}
+
+// ── Excel ──────────────────────────────────────────────────────────────────
+async function genXlsx(rows) {
+  // SheetJS via ESM
+  const XLSX = await import('https://esm.sh/xlsx@0.18.5');
+  const wb = XLSX.utils.book_new();
+
+  // ── 情報シート ──
+  const infoData=[
+    ['香盤表',S.title||''],
+    ['撮影日・場所',S.dateplace||''],
+    ['撮影種別',S.medium||''],
+    ['撮影場所',S.location||''],
+    ['スタッフイン',offsetTime(S.shootStart,-60)],
+    ['撮影開始',S.shootStart||''],
+    ['昼休憩',S.lunch||''],
+    ['撮影終了',S.shootEnd||''],
+    ['完全撤収',S.wrapUp||''],
+    ['クライアント',S.client==='来場する'?`来場（${S.clientTime}）`:(S.client||'—')],
+    ['キャスト',S.casts.map(c=>`${c.name}（IN:${c.inTime||'—'}${c.outTime?'〜'+c.outTime:''}）`).join('、')],
+  ];
+  const wsInfo=XLSX.utils.aoa_to_sheet(infoData);
+  wsInfo['!cols']=[{wch:16},{wch:40}];
+  XLSX.utils.book_append_sheet(wb,wsInfo,'基本情報');
+
+  // ── 香盤表シート ──
+  const header=['No./種別','開始','終了','内容','種別','カメラ','備考'];
+  const data=[header];
+  rows.forEach(r=>{
+    const rt=r.row_type||'cut';
+    if(rt==='cut'){
+      data.push([r.num||'',r.timeS||'',r.timeE||'',r.content||'',r.type||'',r.cam||'',r.note||'']);
+    } else {
+      data.push([ROW_LABEL[rt]||rt,r.timeS||'',r.timeE||'',r.content||'','','',r.note||'']);
+    }
+  });
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:18},{wch:8},{wch:8},{wch:40},{wch:10},{wch:12},{wch:20}];
+
+  // 行の高さとスタイル（SheetJSではセルスタイルはProのみ対応のため基本的なものだけ）
+  XLSX.utils.book_append_sheet(wb,ws,'香盤表');
+
+  const buf=XLSX.write(wb,{type:'array',bookType:'xlsx'});
+  downloadBlob(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),`香盤表_${S.title||'撮影'}.xlsx`);
+}
+
+// ── PPTX ──────────────────────────────────────────────────────────────────
+async function genPptx(rows, ori) {
+  if(!window.PptxGenJS){toast('PptxGenJS読み込み中です','err');return;}
+  const pres=new window.PptxGenJS();
+  const staffIn=offsetTime(S.shootStart,-60);
+
+  if(ori==='l'){
+    pres.layout='LAYOUT_WIDE';
+    await buildPptxLandscape(pres,rows,staffIn);
+  } else {
+    pres.defineLayout({name:'A4P',width:7.5,height:10.6});
+    pres.layout='A4P';
+    await buildPptxPortrait(pres,rows,staffIn);
+  }
+
+  const b64=await pres.write({outputType:'base64'});
+  const bin=atob(b64);const buf=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)buf[i]=bin.charCodeAt(i);
+  downloadBlob(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.presentationml.presentation'}),`香盤表_${ori==='l'?'横向き':'縦向き'}_${S.title||'撮影'}.pptx`);
+}
+
+function downloadBlob(blob,fname){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=fname;
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},1000);
+}
+
+const msw=()=>({type:'outer',blur:4,offset:2,angle:135,color:'000000',opacity:0.07});
+
+function pptxInfoSlide(pres,staffIn){
+  const s=pres.addSlide();s.background={color:PC.wh};
+  const isL=pres.layout==='LAYOUT_WIDE';
+  const W=isL?13.3:7.5;
+  s.addShape('rect',{x:0,y:0,w:W,h:isL?1.05:.88,fill:{color:PC.g},line:{color:PC.g}});
+  s.addText(S.title||'撮影香盤表',{x:.35,y:.1,w:W-.7,h:isL?.5:.42,fontSize:isL?21:17,bold:true,color:PC.wh,fontFace:'Meiryo UI',margin:0});
+  s.addText(S.dateplace||'',{x:.35,y:isL?.62:.53,w:W-.7,h:.3,fontSize:10,color:'9FE1CB',fontFace:'Meiryo UI',margin:0});
+
+  const cards=[
+    {l:'スタッフイン',v:staffIn||'—'},{l:'撮影開始',v:S.shootStart||'—'},
+    {l:'昼休憩',v:S.lunch||'—'},{l:'撮影終了',v:S.shootEnd||'—'},
+    {l:'完全撤収',v:S.wrapUp||'—'},{l:'場所',v:S.location||'—'},
+  ];
+
+  if(isL){
+    cards.forEach((c,i)=>{
+      const x=.35+i*2.22,y=1.2,w=2.0,h=1.1;
+      s.addShape('rect',{x,y,w,h,fill:{color:PC.su},line:{color:PC.bd,pt:.5},shadow:msw()});
+      s.addShape('rect',{x,y,w,h:.24,fill:{color:PC.g},line:{color:PC.g}});
+      s.addText(c.l,{x,y:y+.02,w,h:.22,fontSize:8.5,bold:true,color:PC.wh,align:'center',fontFace:'Meiryo UI',margin:0});
+      s.addText(c.v,{x:x+.06,y:y+.28,w:w-.12,h:h-.34,fontSize:11.5,color:PC.tx,fontFace:'Meiryo UI',align:'center',valign:'middle'});
+    });
+    // キャスト
+    if(S.casts.length){
+      s.addShape('rect',{x:.35,y:2.48,w:12.6,h:.26,fill:{color:PC.gd},line:{color:PC.gd}});
+      s.addText('キャスト',{x:.45,y:2.5,w:3,h:.22,fontSize:9.5,bold:true,color:PC.wh,fontFace:'Meiryo UI',margin:0});
+      const castTxt=S.casts.map(c=>`${c.name}（IN:${c.inTime||'—'}${c.outTime?'〜'+c.outTime:''}）`).join('　');
+      s.addShape('rect',{x:.35,y:2.76,w:12.6,h:.44,fill:{color:'E8F8F0'},line:{color:PC.bd,pt:.5}});
+      s.addText(castTxt,{x:.5,y:2.78,w:12,h:.4,fontSize:11,color:PC.tx,fontFace:'Meiryo UI',valign:'middle'});
+    }
+  } else {
+    cards.slice(0,4).forEach((c,i)=>{
+      const px=.15+(i%2)*3.6,py=1.0+Math.floor(i/2)*.94,cw=3.45,ch=.82;
+      s.addShape('rect',{x:px,y:py,w:cw,h:ch,fill:{color:PC.su},line:{color:PC.bd,pt:.5}});
+      s.addShape('rect',{x:px,y:py,w:cw,h:.22,fill:{color:PC.g},line:{color:PC.g}});
+      s.addText(c.l,{x:px,y:py+.02,w:cw,h:.2,fontSize:8.5,bold:true,color:PC.wh,align:'center',fontFace:'Meiryo UI',margin:0});
+      s.addText(c.v,{x:px+.1,y:py+.26,w:cw-.2,h:ch-.32,fontSize:12,color:PC.tx,fontFace:'Meiryo UI',align:'center',valign:'middle'});
+    });
+    if(S.casts.length){
+      s.addShape('rect',{x:.15,y:2.96,w:7.2,h:.25,fill:{color:PC.gd},line:{color:PC.gd}});
+      s.addText('キャスト',{x:.25,y:2.98,w:3,h:.2,fontSize:9.5,bold:true,color:PC.wh,fontFace:'Meiryo UI',margin:0});
+      s.addShape('rect',{x:.15,y:3.23,w:7.2,h:.44,fill:{color:'E8F8F0'},line:{color:PC.bd,pt:.5}});
+      s.addText(S.casts.map(c=>`${c.name}（IN:${c.inTime||'—'}${c.outTime?'〜'+c.outTime:''}）`).join('　'),{x:.25,y:3.25,w:7,h:.4,fontSize:10,color:PC.tx,fontFace:'Meiryo UI',valign:'middle'});
+    }
+  }
+  return s;
+}
+
+function addPptxRow(slide,row,x,y,cols,rh,isL){
+  const rt=row.row_type||'cut';
+  const totalW=cols.reduce((s,c)=>s+c.w,0);
+  const fsize=isL?8.5:7.5;
+
+  if(rt!=='cut'){
+    const bg=ROW_BG[rt]||'F5F5F5';
+    const label=ROW_LABEL[rt]||rt;
+    slide.addShape('rect',{x,y,w:totalW,h:rh,fill:{color:bg},line:{color:PC.bd,pt:.5}});
+    if(row.timeS) slide.addText(row.timeS,{x:x+cols[0].w+.03,y:y+.02,w:cols[1].w-.06,h:rh-.04,fontSize:fsize-1,color:'666660',align:'center',fontFace:'Meiryo UI',valign:'middle',wrap:true});
+    slide.addText(`${label}　${row.content||''}`,{x:x+cols[0].w+cols[1].w+.04,y:y+.02,w:totalW-cols[0].w-cols[1].w-.08,h:rh-.04,fontSize:fsize-1,color:'444440',bold:['shoot_start','shoot_end','wrap_up'].includes(rt),fontFace:'Meiryo UI',valign:'middle',wrap:true});
+    return;
+  }
+
+  const isV=row.type==='動画';
+  const bg=isV?PC.bl:PC.gl;
+  const is2cam=row.cam==='2カメ同時';
+  let cx=x;
+  [
+    {t:row.num||'',w:cols[0].w,b:true,a:'center',bg},
+    {t:row.timeS&&row.timeE?`${row.timeS}〜${row.timeE}`:row.timeS||'',w:cols[1].w,a:'center',bg:'F9F9F9'},
+    {t:row.content||'',w:cols[2].w,bg},
+    {t:row.location||'',w:cols[3].w,bg:'F0F8FF'},
+    {t:row.cast||'',w:cols[4].w,bg:'F0FAF5'},
+    {t:row.durationMin?(row.durationMin<60?row.durationMin+'分':row.durationMin===60?'1時間':row.durationMin%60===0?(row.durationMin/60)+'時間':(Math.floor(row.durationMin/60))+'時間'+(row.durationMin%60)+'分'):'',w:cols[5].w,a:'center',bg:'FFFEF5'},
+    {t:row.note||'',w:cols[6].w,bg:PC.wh},
+  ].forEach(cell=>{
+    slide.addShape('rect',{x:cx,y,w:cell.w,h:rh,fill:{color:cell.bg||bg},line:{color:PC.bd,pt:.5}});
+    if(cell.t) slide.addText(cell.t,{x:cx+.04,y:y+.02,w:cell.w-.08,h:rh-.04,fontSize:fsize,color:cell.c||PC.tx,bold:cell.b||false,align:cell.a||'left',valign:'middle',fontFace:'Meiryo UI',wrap:true,lineSpacingMultiple:1});
+    cx+=cell.w;
+  });
+}
+
+// 行種別ごとの高さ（インチ）
+const ROW_H = {
+  cut: .46,        // カット行
+  break: .26,      // 休憩
+  set_change: .22, // セットチェンジ
+  move: .24,       // 移動
+  staff_in: .22,   // スタッフイン
+  client_in: .22,  // クライアントイン
+  model_in: .22,   // キャストイン
+  model_out: .22,  // キャストアウト
+  shoot_start: .28,// 撮影開始
+  shoot_end: .25,  // 撮影終了
+  wrap_up: .25,    // 完全撤収
+};
+function rowH(rt){ return ROW_H[rt]||.52; }
+
+async function buildPptxLandscape(pres,rows,staffIn){
+  pptxInfoSlide(pres,staffIn);
+  const s=pres.addSlide();s.background={color:PC.wh};
+  s.addShape('rect',{x:0,y:0,w:13.3,h:.55,fill:{color:PC.g},line:{color:PC.g}});
+  s.addText(`${S.title||'香盤表'}　スケジュール`,{x:.3,y:.09,w:10,h:.38,fontSize:13.5,bold:true,color:PC.wh,fontFace:'Meiryo UI',margin:0});
+  const cols=[{l:'No.',w:.65},{l:'時間',w:1.5},{l:'内容',w:3.4},{l:'場所',w:1.2},{l:'キャスト',w:1.1},{l:'所要時間',w:.9},{l:'備考/コンテ',w:4.04}];
+  let cx=.25;
+  const HDR_Y=.62, HDR_H=.26;
+  cols.forEach(col=>{
+    s.addShape('rect',{x:cx,y:HDR_Y,w:col.w,h:HDR_H,fill:{color:PC.g},line:{color:PC.gd,pt:.5}});
+    s.addText(col.l,{x:cx,y:HDR_Y,w:col.w,h:HDR_H,fontSize:9,bold:true,color:PC.wh,align:'center',valign:'middle',fontFace:'Meiryo UI',margin:0});
+    cx+=col.w;
+  });
+  // 余白を詰める：カット行を引き伸ばす
+  const AVAIL_L = 7.4 - (HDR_Y+HDR_H);
+  const lRows = rows.map(row=>({row, rh:rowH(row.row_type||'cut')}));
+  const totalHL = lRows.reduce((s,r)=>s+r.rh,0);
+  const surplusL = AVAIL_L - totalHL;
+  if(surplusL > 0.1){
+    const cutRowsL = lRows.filter(r=>(r.row.row_type||'cut')==='cut');
+    if(cutRowsL.length > 0){
+      const extra = surplusL / cutRowsL.length;
+      cutRowsL.forEach(r=>{ r.rh += extra; });
+    }
+  }
+  let ry=HDR_Y+HDR_H;
+  lRows.forEach(({row,rh:rh2})=>{
+    if(ry+rh2>7.42) return;
+    addPptxRow(s,row,.25,ry,cols,rh2,true);
+    ry+=rh2;
+  });
+  s.addText('※ 撮影の進行状況により順序・時間が変更になる場合があります',{x:.25,y:7.34,w:12,h:.14,fontSize:7,color:PC.gr,fontFace:'Meiryo UI',italic:true});
+}
+
+async function buildPptxPortrait(pres,rows,staffIn){
+  pptxInfoSlide(pres,staffIn);
+  // 縦A4の高さに収まるよう行を自動ページ分割
+  const ROW_H_P = { // 縦向き用
+    cut:.40, break:.22, set_change:.20, move:.22, staff_in:.20, client_in:.20,
+    model_in:.20, model_out:.20, shoot_start:.24, shoot_end:.22, wrap_up:.22,
+  };
+  const PAGE_H = 10.6;
+  const HDR_Y = .52, HDR_H = .24, FOOTER = .22;
+  const AVAIL = PAGE_H - HDR_Y - HDR_H - FOOTER;
+  const pc=[{l:'No.',w:.48},{l:'時間',w:1.3},{l:'内容',w:1.9},{l:'場所',w:.82},{l:'キャスト',w:.72},{l:'所要時間',w:.62},{l:'備考/コンテ',w:1.51}];
+
+  // ページに分割
+  const pages = [[]];
+  let pageH = 0;
+  rows.forEach(row=>{
+    const rh2 = ROW_H_P[row.row_type||'cut']||.46;
+    if(pageH+rh2 > AVAIL && pages[pages.length-1].length>0){
+      pages.push([]); pageH=0;
+    }
+    pages[pages.length-1].push({row,rh:rh2});
+    pageH+=rh2;
+  });
+
+  pages.forEach((pageRows, pageNum)=>{
+    // ── 余白をカット行に均等分配してページをいっぱいに使う ──
+    const usedH = pageRows.reduce((s,r)=>s+r.rh, 0);
+    const surplus = AVAIL - usedH;
+    if (surplus > 0.05) {
+      const cutRows = pageRows.filter(r=>(r.row.row_type||'cut')==='cut');
+      if (cutRows.length > 0) {
+        const extra = surplus / cutRows.length;
+        cutRows.forEach(r=>{ r.rh += extra; });
+      } else {
+        // カット行がない場合は全行に均等分配
+        const extra = surplus / pageRows.length;
+        pageRows.forEach(r=>{ r.rh += extra; });
+      }
+    }
+
+    const s=pres.addSlide();s.background={color:PC.wh};
+    s.addShape('rect',{x:0,y:0,w:7.5,h:.46,fill:{color:PC.g},line:{color:PC.g}});
+    const half=pages.length<=1?'':(pageNum===0?'　前半':'　後半');
+    s.addText(`${S.title||'香盤表'}　スケジュール${half}`,{x:.2,y:.07,w:7,h:.34,fontSize:12,bold:true,color:PC.wh,fontFace:'Meiryo UI',margin:0});
+    let pcx=.15;
+    pc.forEach(col=>{
+      s.addShape('rect',{x:pcx,y:HDR_Y,w:col.w,h:HDR_H,fill:{color:PC.g},line:{color:PC.gd,pt:.5}});
+      s.addText(col.l,{x:pcx,y:HDR_Y,w:col.w,h:HDR_H,fontSize:8,bold:true,color:PC.wh,align:'center',valign:'middle',fontFace:'Meiryo UI',margin:0});
+      pcx+=col.w;
+    });
+    let ry=HDR_Y+HDR_H;
+    pageRows.forEach(({row,rh})=>{
+      addPptxRow(s,row,.15,ry,pc,rh,false);
+      ry+=rh;
+    });
+    s.addText('※ 撮影の進行状況により変更になる場合があります',{x:.15,y:10.44,w:7.2,h:.13,fontSize:6.5,color:PC.gr,fontFace:'Meiryo UI',italic:true});
+  });
+}
+</script>
+</body>
+</html>
