@@ -131,11 +131,13 @@
   .inf { border: 1px solid var(--line); border-radius: 9px; padding: 12px 14px; margin-bottom: 10px; background: #fbfdfd; }
   .inf.inf-dog { border-left: 4px solid #B85042; }
   .inf.inf-cat { border-left: 4px solid #2A7F8E; }
+  .inf.inf-mix { border-left: 4px solid #8064A2; }
   .inf .name { font-weight: 700; color: var(--blue); font-size: 14px; margin-bottom: 6px; }
   .inf .name a { color: var(--blue); text-decoration: underline; }
   .inf .badge { background: #eef4f4; }
   .inf.inf-dog .badge { background: #FDF1EE; color: #B85042; }
   .inf.inf-cat .badge { background: #EAF5F6; color: #2A7F8E; }
+  .inf.inf-mix .badge { background: #F3EEFA; color: #8064A2; }
   .inf dl { display: grid; grid-template-columns: 84px 1fr; gap: 2px 10px; font-size: 12px; }
   .inf dt { color: var(--ink-soft); }
   .inf dd { color: var(--ink); word-break: break-word; }
@@ -507,16 +509,46 @@ function csvToRows(text) {
   if (cur !== "" || row.length) { row.push(cur); rows.push(row); }
   return rows;
 }
+/* エイリアス方式：CSV/JSONの列名が多少変わっても拾えるようにする */
+const CAST_ALIASES = {
+  account:   ["account", "handle", "name", "アカウント", "アカウント名"],
+  url:       ["url", "instagram", "link", "URL", "リンク"],
+  followers: ["followers", "totalfollowers", "フォロワー数", "総フォロワー数"],
+  breed:     ["breed", "犬種", "猫種", "犬種／猫種", "犬種・猫種", "品種"],
+  names:     ["names", "petname", "ペット名", "名前"],
+  category:  ["category", "species", "カテゴリ", "種別"],
+  area:      ["area", "エリア", "地域"],
+  age:       ["age", "年齢"],
+  notes:     ["notes", "note", "備考", "メモ"]
+};
+function castPick(o, keys) {
+  for (const k of keys) {
+    for (const objKey in o) {
+      if (objKey.toLowerCase() === k.toLowerCase() && o[objKey] != null && String(o[objKey]).trim() !== "") {
+        return String(o[objKey]);
+      }
+    }
+  }
+  return "";
+}
+// カテゴリ表記ゆれ吸収：「犬」「猫」どちらも含む場合は「犬・猫」（両方のページに掲載）
+function castNormCategory(raw) {
+  const s = (raw || "").toString();
+  const hasDog = /犬/.test(s), hasCat = /猫/.test(s);
+  if (hasDog && hasCat) return "犬・猫";
+  return hasCat ? "猫" : "犬";
+}
 function normInf(o) {
   return {
-    account: (o.account || o.handle || o.name || "").toString().trim(),
-    url: (o.url || o.instagram || "").toString().trim(),
-    followers: Number(String(o.followers == null ? "" : o.followers).replace(/[^0-9.]/g, "")) || 0,
-    breed: (o.breed || "").toString().trim(),
-    names: (o.names || o.petName || "").toString().trim(),
-    category: (o.category || o.species || "犬").toString().trim() === "猫" ? "猫" : "犬",
-    area: (o.area || "").toString().trim(),
-    age: (o.age == null ? "" : o.age).toString().trim()
+    account: castPick(o, CAST_ALIASES.account).trim(),
+    url: castPick(o, CAST_ALIASES.url).trim(),
+    followers: Number(castPick(o, CAST_ALIASES.followers).replace(/[^0-9.]/g, "")) || 0,
+    breed: castPick(o, CAST_ALIASES.breed).trim(),
+    names: castPick(o, CAST_ALIASES.names).trim(),
+    category: castNormCategory(castPick(o, CAST_ALIASES.category)),
+    area: castPick(o, CAST_ALIASES.area).trim(),
+    age: castPick(o, CAST_ALIASES.age).trim(),
+    notes: castPick(o, CAST_ALIASES.notes).trim()
   };
 }
 function parseCasting(text) {
@@ -537,6 +569,16 @@ function parseCasting(text) {
     .map(r => { const o = {}; headers.forEach((h, i) => o[h] = r[i] != null ? r[i] : ""); return normInf(o); })
     .filter(d => d.account || d.url);
 }
+// 備考欄の要約：URLだけなら「投稿を見る」リンクに、それ以外はテキストのまま
+function summarizeNotes(notes) {
+  if (!notes) return { text: "", url: null };
+  const lines = notes.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  const urlLines = lines.filter(s => /^https?:\/\//i.test(s));
+  if (urlLines.length && urlLines.length === lines.length) {
+    return { text: urlLines.length > 1 ? `投稿を見る（${urlLines.length}件）` : "投稿を見る", url: urlLines[0] };
+  }
+  return { text: lines.join("／"), url: urlLines[0] || null };
+}
 function renderInfluencers() {
   const pv = document.getElementById("preview");
   const actions = document.getElementById("actions");
@@ -548,16 +590,22 @@ function renderInfluencers() {
   count.textContent = influencers.length + " 件";
   pv.innerHTML = influencers.map(d => {
     const isCat = d.category === "猫";
+    const isMix = d.category === "犬・猫";
+    const cls = isMix ? "mix" : (isCat ? "cat" : "dog");
+    const breedLabel = isMix ? "犬種／猫種" : (isCat ? "猫種" : "犬種");
     const fol = d.followers ? d.followers.toLocaleString() : '<span class="miss">（未確認）</span>';
     const acc = d.url
       ? `<a href="${d.url}" target="_blank" rel="noopener">${d.account || "（名称なし）"}</a>`
       : (d.account || '<span class="miss">（名称なし）</span>');
-    return `<div class="inf inf-${isCat ? "cat" : "dog"}">
+    const note = summarizeNotes(d.notes);
+    return `<div class="inf inf-${cls}">
       <div class="name">${acc} <span class="badge">${d.category}</span></div>
       <dl>
-        <dt>${isCat ? "猫種" : "犬種"}</dt><dd>${d.breed || '<span class="miss">（未記入）</span>'}</dd>
+        <dt>${breedLabel}</dt><dd>${d.breed || '<span class="miss">（未記入）</span>'}</dd>
         <dt>フォロワー</dt><dd>${fol}</dd>
         ${d.area ? `<dt>エリア</dt><dd>${d.area}</dd>` : ""}
+        ${d.age ? `<dt>年齢</dt><dd>${d.age}</dd>` : ""}
+        ${note.text ? `<dt>備考</dt><dd>${note.url ? `<a href="${note.url}" target="_blank" rel="noopener">${note.text}</a>` : note.text}</dd>` : ""}
       </dl>
     </div>`;
   }).join("");
@@ -575,6 +623,7 @@ function castCircle(n) { return CAST_CIRCLED[n] || ("(" + n + ")"); }
 function castPal(sp) { return sp === "猫" ? CAST_PAL.cat : CAST_PAL.dog; }
 function castFmt(n) { n = Number(n) || 0; return n.toLocaleString("en-US"); }
 function castHandle(a) { a = (a || "").trim(); if (!a) return "（名称なし）"; return a[0] === "@" ? a : "@" + a; }
+function castFolText(n) { n = Number(n) || 0; return n > 0 ? castFmt(n) + " F" : "未確認"; }
 
 function castTitleBar(pptx, slide, species, pageInSpecies) {
   const c = castPal(species);
@@ -589,12 +638,13 @@ function castTitleBar(pptx, slide, species, pageInSpecies) {
   slide.addText("※ ご発注後より裏取りを実施致します。　F ＝ フォロワー数", { x:5, y:7.12, w:7.85, h:0.3, fontSize:9, color:CAST_PAL.sub, align:"right", valign:"middle", fontFace:"Meiryo", margin:0 });
 }
 
-function castCard(pptx, slide, inf, x, y, w, h) {
-  const sp = inf.category === "猫" ? "猫" : "犬";
-  const c = castPal(sp);
+// pageSpecies: このページの犬/猫カラーテーマ。inf.category が「犬・猫」の場合も
+// 掲載中のページ側の色で描画し、バッジ文言だけ実際のカテゴリを表示する。
+function castCard(pptx, slide, inf, x, y, w, h, pageSpecies) {
+  const c = castPal(pageSpecies);
   slide.addShape(pptx.ShapeType.roundRect, { x, y, w, h, rectRadius:0.07, fill:{color:c.body}, line:{color:c.border, width:1.25} });
   slide.addShape(pptx.ShapeType.rect, { x:x+0.06, y:y+0.06, w:w-0.12, h:0.34, fill:{color:c.hdr}, line:{color:c.hdr} });
-  slide.addText(`★ キャスティ PR 候補（${sp}）`, { x:x+0.06, y:y+0.06, w:w-0.12, h:0.34, fontSize:9, bold:true, color:CAST_PAL.white, align:"center", valign:"middle", fontFace:"Meiryo", margin:0 });
+  slide.addText(`★ キャスティ PR 候補（${inf.category}）`, { x:x+0.06, y:y+0.06, w:w-0.12, h:0.34, fontSize:9, bold:true, color:CAST_PAL.white, align:"center", valign:"middle", fontFace:"Meiryo", margin:0 });
   const pw = Math.min(1.75, w-0.7), ph = 1.28, px = x+(w-pw)/2, py = y+0.5;
   slide.addShape(pptx.ShapeType.rect, { x:px, y:py, w:pw, h:ph, fill:{color:"F2F2F2"}, line:{color:"D9D9D9", width:1} });
   slide.addText("写真", { x:px, y:py, w:pw, h:ph, fontSize:11, color:"B0B0B0", align:"center", valign:"middle", fontFace:"Meiryo", margin:0 });
@@ -604,7 +654,7 @@ function castCard(pptx, slide, inf, x, y, w, h) {
   slide.addText(castHandle(inf.account), ho);
   slide.addText(inf.breed || "", { x:tx, y:y+2.18, w:tw, h:0.22, fontSize:9.5, color:CAST_PAL.sub, valign:"middle", fontFace:"Meiryo", margin:0 });
   slide.addText(inf.names || "", { x:tx, y:y+2.38, w:tw, h:0.22, fontSize:9.5, color:CAST_PAL.sub, valign:"middle", fontFace:"Meiryo", margin:0 });
-  slide.addText(`${castFmt(inf.followers)} F`, { x:tx, y:y+2.60, w:tw, h:0.3, fontSize:13, bold:true, color:c.accent, valign:"middle", fontFace:"Meiryo", margin:0 });
+  slide.addText(castFolText(inf.followers), { x:tx, y:y+2.60, w:tw, h:0.3, fontSize:13, bold:true, color: inf.followers > 0 ? c.accent : CAST_PAL.sub, valign:"middle", fontFace:"Meiryo", margin:0 });
 }
 
 function castCover(pptx, dogN, catN, total) {
@@ -618,17 +668,29 @@ function castCover(pptx, dogN, catN, total) {
   s.addText("PECO Inc.　｜　Influencer Marketing Division", { x:0.97, y:4.5, w:11, h:0.35, fontSize:10, color:"888888", fontFace:"Meiryo", valign:"middle", margin:0 });
 }
 
-/* ---- 提案デッキ（表形式スタイル：写真アイコン＋行リスト） ---- */
-const CAST_TABLE_COLS = [
-  { key: "account",   label: "アカウント",     w: 3.0 },
-  { key: "followers", label: "総フォロワー数", w: 1.5 },
-  { key: "breed",     label: "犬種／猫種",     w: 1.7 },
-  { key: "age",       label: "年齢",           w: 0.9 },
-  { key: "names",     label: "ペット名",       w: 1.9 },
-  { key: "sns",       label: "主な活動SNS",    w: 1.7 },
-  { key: "area",      label: "備考",           w: 1.633 }
-];
-const CAST_TABLE_W = CAST_TABLE_COLS.reduce((s, c) => s + c.w, 0);
+/* ---- 提案デッキ（表形式スタイル：写真アイコン＋行リスト）----
+   列構成はデータに含まれる項目（年齢・エリア・備考の有無）に応じて自動調整される。
+   これにより、CSVの列が多少変わっても手直しなしで出力できる。 */
+const CAST_TABLE_TOTAL_W = 12.333; // LAYOUT_WIDE(13.333in) から左右マージン0.5inずつを引いた幅
+
+function buildCastTableColumns(data) {
+  const hasAge = data.some(d => d.age);
+  const hasNotes = data.some(d => d.notes);
+  const hasArea = data.some(d => d.area);
+  const cols = [
+    { key: "account",   label: "アカウント",     flex: 3.0 },
+    { key: "followers", label: "総フォロワー数", flex: 1.5 },
+    { key: "breed",     label: "犬種／猫種",     flex: 1.7 }
+  ];
+  if (hasAge) cols.push({ key: "age", label: "年齢", flex: 0.8 });
+  cols.push({ key: "names", label: "ペット名", flex: 1.7 });
+  if (hasArea) cols.push({ key: "area", label: "エリア", flex: 1.0 });
+  cols.push({ key: "sns", label: "主な活動SNS", flex: 1.5 });
+  if (hasNotes) cols.push({ key: "notes", label: "備考", flex: 1.8 });
+  const totalFlex = cols.reduce((s, c) => s + c.flex, 0);
+  cols.forEach(c => { c.w = c.flex / totalFlex * CAST_TABLE_TOTAL_W; });
+  return cols;
+}
 
 function castTableTitleBar(pptx, slide, species, pageInSpecies) {
   const c = castPal(species);
@@ -638,64 +700,70 @@ function castTableTitleBar(pptx, slide, species, pageInSpecies) {
     { x: 0.5, y: 0.3, w: 9, h: 0.5, fontSize: 26, bold: true, color: CAST_PAL.ink, valign: "middle", fontFace: "Meiryo", margin: 0 });
   slide.addText(ord,
     { x: 9.6, y: 0.4, w: 3.233, h: 0.4, fontSize: 11, color: CAST_PAL.sub, align: "right", valign: "middle", fontFace: "Meiryo", margin: 0 });
-  slide.addShape(pptx.ShapeType.rect, { x: 0.5, y: 0.86, w: CAST_TABLE_W, h: 0.045, fill: { color: c.accent }, line: { color: c.accent } });
+  slide.addShape(pptx.ShapeType.rect, { x: 0.5, y: 0.86, w: CAST_TABLE_TOTAL_W, h: 0.045, fill: { color: c.accent }, line: { color: c.accent } });
   slide.addText("© 2026  Peco", { x: 0.5, y: 7.15, w: 4, h: 0.28, fontSize: 9, color: CAST_PAL.sub, valign: "middle", fontFace: "Meiryo", margin: 0 });
   slide.addText("※ ご発注後より裏取りを実施致します。　F ＝ フォロワー数",
-    { x: 5.6, y: 7.15, w: CAST_TABLE_W - 5.1, h: 0.28, fontSize: 9, color: CAST_PAL.sub, align: "right", valign: "middle", fontFace: "Meiryo", margin: 0 });
+    { x: 5.6, y: 7.15, w: CAST_TABLE_TOTAL_W - 5.1, h: 0.28, fontSize: 9, color: CAST_PAL.sub, align: "right", valign: "middle", fontFace: "Meiryo", margin: 0 });
 }
 
-function castTableHeader(pptx, slide, x, y) {
-  slide.addShape(pptx.ShapeType.rect, { x, y, w: CAST_TABLE_W, h: 0.4, fill: { color: "EFEFEF" }, line: { color: "EFEFEF" } });
+function castTableHeader(pptx, slide, x, y, cols) {
+  const w = cols.reduce((s, c) => s + c.w, 0);
+  slide.addShape(pptx.ShapeType.rect, { x, y, w, h: 0.4, fill: { color: "EFEFEF" }, line: { color: "EFEFEF" } });
   let cx = x;
-  CAST_TABLE_COLS.forEach(col => {
+  cols.forEach(col => {
     slide.addText(col.label, { x: cx + 0.08, y, w: col.w - 0.16, h: 0.4, fontSize: 10.5, bold: true, color: "666666", valign: "middle", fontFace: "Meiryo", margin: 0 });
     cx += col.w;
   });
 }
 
-function castTableRow(pptx, slide, inf, x, y, h) {
-  const sp = inf.category === "猫" ? "猫" : "犬";
-  const c = castPal(sp);
-  slide.addShape(pptx.ShapeType.line, { x, y: y + h, w: CAST_TABLE_W, h: 0, line: { color: "EFEFEF", width: 1 } });
+function castTableRow(pptx, slide, inf, x, y, h, cols, pageSpecies) {
+  const c = castPal(pageSpecies);
+  const w = cols.reduce((s, col) => s + col.w, 0);
+  slide.addShape(pptx.ShapeType.line, { x, y: y + h, w, h: 0, line: { color: "EFEFEF", width: 1 } });
 
   let cx = x;
-  const accCol = CAST_TABLE_COLS[0];
-  const avatarD = 0.5;
-  slide.addShape(pptx.ShapeType.ellipse, { x: cx + 0.08, y: y + (h - avatarD) / 2, w: avatarD, h: avatarD, fill: { color: "F2F2F2" }, line: { color: "D9D9D9", width: 1 } });
-  const nameOpts = { x: cx + 0.08 + avatarD + 0.12, y, w: accCol.w - 0.16 - avatarD - 0.12, h, fontSize: 12, bold: true, color: CAST_PAL.ink, valign: "middle", fontFace: "Meiryo", margin: 0 };
-  if (inf.url) nameOpts.hyperlink = { url: inf.url, tooltip: inf.account };
-  slide.addText(castHandle(inf.account), nameOpts);
-  cx += accCol.w;
-
-  slide.addText(castFmt(inf.followers), { x: cx + 0.08, y, w: CAST_TABLE_COLS[1].w - 0.16, h, fontSize: 12, bold: true, color: c.accent, valign: "middle", fontFace: "Meiryo", margin: 0 });
-  cx += CAST_TABLE_COLS[1].w;
-
-  slide.addText(inf.breed || "-", { x: cx + 0.08, y, w: CAST_TABLE_COLS[2].w - 0.16, h, fontSize: 10.5, color: CAST_PAL.ink, valign: "middle", fontFace: "Meiryo", margin: 0 });
-  cx += CAST_TABLE_COLS[2].w;
-
-  slide.addText(inf.age || "-", { x: cx + 0.08, y, w: CAST_TABLE_COLS[3].w - 0.16, h, fontSize: 10.5, color: CAST_PAL.ink, align: "center", valign: "middle", fontFace: "Meiryo", margin: 0 });
-  cx += CAST_TABLE_COLS[3].w;
-
-  slide.addText(inf.names || "-", { x: cx + 0.08, y, w: CAST_TABLE_COLS[4].w - 0.16, h, fontSize: 10.5, color: CAST_PAL.ink, valign: "middle", fontFace: "Meiryo", margin: 0 });
-  cx += CAST_TABLE_COLS[4].w;
-
-  const snsOpts = { x: cx + 0.08, y, w: CAST_TABLE_COLS[5].w - 0.16, h, fontSize: 10.5, color: "2E75B6", underline: true, valign: "middle", fontFace: "Meiryo", margin: 0 };
-  if (inf.url) snsOpts.hyperlink = { url: inf.url, tooltip: inf.account };
-  slide.addText(inf.url ? "Instagram" : "-", snsOpts);
-  cx += CAST_TABLE_COLS[5].w;
-
-  slide.addText(inf.area || "-", { x: cx + 0.08, y, w: CAST_TABLE_COLS[6].w - 0.16, h, fontSize: 10.5, color: CAST_PAL.sub, valign: "middle", fontFace: "Meiryo", margin: 0 });
+  cols.forEach(col => {
+    const colW = col.w;
+    if (col.key === "account") {
+      const avatarD = 0.5;
+      slide.addShape(pptx.ShapeType.ellipse, { x: cx + 0.08, y: y + (h - avatarD) / 2, w: avatarD, h: avatarD, fill: { color: "F2F2F2" }, line: { color: "D9D9D9", width: 1 } });
+      const nameOpts = { x: cx + 0.08 + avatarD + 0.12, y, w: colW - 0.16 - avatarD - 0.12, h, fontSize: 12, bold: true, color: CAST_PAL.ink, valign: "middle", fontFace: "Meiryo", margin: 0 };
+      if (inf.url) nameOpts.hyperlink = { url: inf.url, tooltip: inf.account };
+      slide.addText(castHandle(inf.account), nameOpts);
+    } else if (col.key === "followers") {
+      const has = inf.followers > 0;
+      slide.addText(has ? castFmt(inf.followers) : "未確認", { x: cx + 0.08, y, w: colW - 0.16, h, fontSize: 12, bold: has, color: has ? c.accent : CAST_PAL.sub, valign: "middle", fontFace: "Meiryo", margin: 0 });
+    } else if (col.key === "breed") {
+      slide.addText(inf.breed || "-", { x: cx + 0.08, y, w: colW - 0.16, h, fontSize: 10, color: CAST_PAL.ink, valign: "middle", fontFace: "Meiryo", margin: 0 });
+    } else if (col.key === "age") {
+      slide.addText(inf.age || "-", { x: cx + 0.08, y, w: colW - 0.16, h, fontSize: 10.5, color: CAST_PAL.ink, align: "center", valign: "middle", fontFace: "Meiryo", margin: 0 });
+    } else if (col.key === "names") {
+      slide.addText(inf.names || "-", { x: cx + 0.08, y, w: colW - 0.16, h, fontSize: 10, color: CAST_PAL.ink, valign: "middle", fontFace: "Meiryo", margin: 0 });
+    } else if (col.key === "area") {
+      slide.addText(inf.area || "-", { x: cx + 0.08, y, w: colW - 0.16, h, fontSize: 10.5, color: CAST_PAL.sub, valign: "middle", fontFace: "Meiryo", margin: 0 });
+    } else if (col.key === "sns") {
+      const snsOpts = { x: cx + 0.08, y, w: colW - 0.16, h, fontSize: 10.5, color: "2E75B6", underline: true, valign: "middle", fontFace: "Meiryo", margin: 0 };
+      if (inf.url) snsOpts.hyperlink = { url: inf.url, tooltip: inf.account };
+      slide.addText(inf.url ? "Instagram" : "-", snsOpts);
+    } else if (col.key === "notes") {
+      const note = summarizeNotes(inf.notes);
+      const noteOpts = { x: cx + 0.08, y, w: colW - 0.16, h, fontSize: 9.5, color: note.url ? "2E75B6" : CAST_PAL.sub, underline: !!note.url, valign: "middle", fontFace: "Meiryo", margin: 0 };
+      if (note.url) noteOpts.hyperlink = { url: note.url, tooltip: inf.account };
+      slide.addText(note.text || "-", noteOpts);
+    }
+    cx += colW;
+  });
 }
 
-function emitSpeciesTable(pptx, list, species) {
+function emitSpeciesTable(pptx, list, species, cols) {
   const perPage = 6, marginX = 0.5, topY = 1.05, rowH = 0.85;
   const pages = Math.ceil(list.length / perPage);
   for (let p = 0; p < pages; p++) {
     const chunk = list.slice(p * perPage, (p + 1) * perPage);
     const s = pptx.addSlide();
     castTableTitleBar(pptx, s, species, p + 1);
-    castTableHeader(pptx, s, marginX, topY);
-    chunk.forEach((inf, idx) => castTableRow(pptx, s, inf, marginX, topY + 0.4 + idx * rowH, rowH));
+    castTableHeader(pptx, s, marginX, topY, cols);
+    chunk.forEach((inf, idx) => castTableRow(pptx, s, inf, marginX, topY + 0.4 + idx * rowH, rowH, cols, species));
   }
 }
 
@@ -705,19 +773,21 @@ function buildCastingDeck(data) {
   pptx.title = "インフルエンサー キャスティング案";
 
   const byFol = (a, b) => (Number(b.followers)||0) - (Number(a.followers)||0);
+  // 「犬・猫」両方の項目を持つアカウントは犬・猫どちらのページにも掲載する
   const dogs = data.filter(d => d.category !== "猫").sort(byFol);
-  const cats = data.filter(d => d.category === "猫").sort(byFol);
+  const cats = data.filter(d => d.category === "猫" || d.category === "犬・猫").sort(byFol);
 
   castCover(pptx, dogs.length, cats.length, data.length);
 
   if (castStyle === "table") {
-    if (dogs.length) emitSpeciesTable(pptx, dogs, "犬");
-    if (cats.length) emitSpeciesTable(pptx, cats, "猫");
+    const tableCols = buildCastTableColumns(data);
+    if (dogs.length) emitSpeciesTable(pptx, dogs, "犬", tableCols);
+    if (cats.length) emitSpeciesTable(pptx, cats, "猫", tableCols);
     return pptx;
   }
 
-  const cols = 4, perPage = 8, marginX = 0.55, colGap = 0.3, rowGap = 0.2;
-  const cW = (13.333 - marginX*2 - colGap*(cols-1)) / cols;
+  const gridCols = 4, perPage = 8, marginX = 0.55, colGap = 0.3, rowGap = 0.2;
+  const cW = (13.333 - marginX*2 - colGap*(gridCols-1)) / gridCols;
   const cH = 2.95, topY = 0.95;
 
   function emitSpecies(list, species) {
@@ -727,8 +797,8 @@ function buildCastingDeck(data) {
       const s = pptx.addSlide();
       castTitleBar(pptx, s, species, p+1);
       chunk.forEach((inf, idx) => {
-        const r = Math.floor(idx/cols), col = idx%cols;
-        castCard(pptx, s, inf, marginX + col*(cW+colGap), topY + r*(cH+rowGap), cW, cH);
+        const r = Math.floor(idx/gridCols), col = idx%gridCols;
+        castCard(pptx, s, inf, marginX + col*(cW+colGap), topY + r*(cH+rowGap), cW, cH, species);
       });
     }
   }
@@ -736,7 +806,6 @@ function buildCastingDeck(data) {
   if (cats.length) emitSpecies(cats, "猫");
   return pptx;
 }
-
 /* ---- モード切り替え ---- */
 function setMode(m) {
   if (m === appMode) return;
