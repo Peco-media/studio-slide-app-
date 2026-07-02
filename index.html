@@ -118,6 +118,16 @@
   }
   .mode-btn.is-active { background: var(--teal); color: #fff; border-color: var(--teal); }
 
+  .style-row { display: none; align-items: center; gap: 8px; margin: -8px 0 18px; }
+  .style-row.is-visible { display: flex; }
+  .style-row .style-label { font-size: 12px; color: var(--ink-soft); font-weight: 600; }
+  .style-btn {
+    font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+    background: #fff; color: var(--ink-soft); border: 1px solid var(--line);
+    border-radius: 7px; padding: 6px 14px; transition: background .15s, color .15s;
+  }
+  .style-btn.is-active { background: #fdeeea; color: #B85042; border-color: #d8a89f; }
+
   .inf { border: 1px solid var(--line); border-radius: 9px; padding: 12px 14px; margin-bottom: 10px; background: #fbfdfd; }
   .inf.inf-dog { border-left: 4px solid #B85042; }
   .inf.inf-cat { border-left: 4px solid #2A7F8E; }
@@ -144,6 +154,12 @@
   <div class="modes">
     <button type="button" class="mode-btn is-active" data-mode="studio">スタジオ資料</button>
     <button type="button" class="mode-btn" data-mode="casting">キャスティング提案</button>
+  </div>
+
+  <div class="style-row" id="styleRow">
+    <span class="style-label">スライドスタイル：</span>
+    <button type="button" class="style-btn is-active" data-style="card">カード型</button>
+    <button type="button" class="style-btn" data-style="table">表形式</button>
   </div>
 
   <div class="grid">
@@ -251,6 +267,7 @@ function guessArea(address) {
 let studios = [];
 let influencers = [];
 let appMode = "studio";
+let castStyle = "card"; // "card" | "table"
 
 function fillOrMissing(v) { return v && v.trim() ? v : '<span class="miss">（未確認）</span>'; }
 
@@ -601,6 +618,87 @@ function castCover(pptx, dogN, catN, total) {
   s.addText("PECO Inc.　｜　Influencer Marketing Division", { x:0.97, y:4.5, w:11, h:0.35, fontSize:10, color:"888888", fontFace:"Meiryo", valign:"middle", margin:0 });
 }
 
+/* ---- 提案デッキ（表形式スタイル：写真アイコン＋行リスト） ---- */
+const CAST_TABLE_COLS = [
+  { key: "account",   label: "アカウント",     w: 3.0 },
+  { key: "followers", label: "総フォロワー数", w: 1.5 },
+  { key: "breed",     label: "犬種／猫種",     w: 1.7 },
+  { key: "age",       label: "年齢",           w: 0.9 },
+  { key: "names",     label: "ペット名",       w: 1.9 },
+  { key: "sns",       label: "主な活動SNS",    w: 1.7 },
+  { key: "area",      label: "備考",           w: 1.633 }
+];
+const CAST_TABLE_W = CAST_TABLE_COLS.reduce((s, c) => s + c.w, 0);
+
+function castTableTitleBar(pptx, slide, species, pageInSpecies) {
+  const c = castPal(species);
+  slide.background = { color: "FFFFFF" };
+  const ord = castCircle(pageInSpecies) + " フォロワー数順" + (pageInSpecies > 1 ? "（続き）" : "");
+  slide.addText(`インフルエンサーリスト（${species}）`,
+    { x: 0.5, y: 0.3, w: 9, h: 0.5, fontSize: 26, bold: true, color: CAST_PAL.ink, valign: "middle", fontFace: "Meiryo", margin: 0 });
+  slide.addText(ord,
+    { x: 9.6, y: 0.4, w: 3.233, h: 0.4, fontSize: 11, color: CAST_PAL.sub, align: "right", valign: "middle", fontFace: "Meiryo", margin: 0 });
+  slide.addShape(pptx.ShapeType.rect, { x: 0.5, y: 0.86, w: CAST_TABLE_W, h: 0.045, fill: { color: c.accent }, line: { color: c.accent } });
+  slide.addText("© 2026  Peco", { x: 0.5, y: 7.15, w: 4, h: 0.28, fontSize: 9, color: CAST_PAL.sub, valign: "middle", fontFace: "Meiryo", margin: 0 });
+  slide.addText("※ ご発注後より裏取りを実施致します。　F ＝ フォロワー数",
+    { x: 5.6, y: 7.15, w: CAST_TABLE_W - 5.1, h: 0.28, fontSize: 9, color: CAST_PAL.sub, align: "right", valign: "middle", fontFace: "Meiryo", margin: 0 });
+}
+
+function castTableHeader(pptx, slide, x, y) {
+  slide.addShape(pptx.ShapeType.rect, { x, y, w: CAST_TABLE_W, h: 0.4, fill: { color: "EFEFEF" }, line: { color: "EFEFEF" } });
+  let cx = x;
+  CAST_TABLE_COLS.forEach(col => {
+    slide.addText(col.label, { x: cx + 0.08, y, w: col.w - 0.16, h: 0.4, fontSize: 10.5, bold: true, color: "666666", valign: "middle", fontFace: "Meiryo", margin: 0 });
+    cx += col.w;
+  });
+}
+
+function castTableRow(pptx, slide, inf, x, y, h) {
+  const sp = inf.category === "猫" ? "猫" : "犬";
+  const c = castPal(sp);
+  slide.addShape(pptx.ShapeType.line, { x, y: y + h, w: CAST_TABLE_W, h: 0, line: { color: "EFEFEF", width: 1 } });
+
+  let cx = x;
+  const accCol = CAST_TABLE_COLS[0];
+  const avatarD = 0.5;
+  slide.addShape(pptx.ShapeType.ellipse, { x: cx + 0.08, y: y + (h - avatarD) / 2, w: avatarD, h: avatarD, fill: { color: "F2F2F2" }, line: { color: "D9D9D9", width: 1 } });
+  const nameOpts = { x: cx + 0.08 + avatarD + 0.12, y, w: accCol.w - 0.16 - avatarD - 0.12, h, fontSize: 12, bold: true, color: CAST_PAL.ink, valign: "middle", fontFace: "Meiryo", margin: 0 };
+  if (inf.url) nameOpts.hyperlink = { url: inf.url, tooltip: inf.account };
+  slide.addText(castHandle(inf.account), nameOpts);
+  cx += accCol.w;
+
+  slide.addText(castFmt(inf.followers), { x: cx + 0.08, y, w: CAST_TABLE_COLS[1].w - 0.16, h, fontSize: 12, bold: true, color: c.accent, valign: "middle", fontFace: "Meiryo", margin: 0 });
+  cx += CAST_TABLE_COLS[1].w;
+
+  slide.addText(inf.breed || "-", { x: cx + 0.08, y, w: CAST_TABLE_COLS[2].w - 0.16, h, fontSize: 10.5, color: CAST_PAL.ink, valign: "middle", fontFace: "Meiryo", margin: 0 });
+  cx += CAST_TABLE_COLS[2].w;
+
+  slide.addText(inf.age || "-", { x: cx + 0.08, y, w: CAST_TABLE_COLS[3].w - 0.16, h, fontSize: 10.5, color: CAST_PAL.ink, align: "center", valign: "middle", fontFace: "Meiryo", margin: 0 });
+  cx += CAST_TABLE_COLS[3].w;
+
+  slide.addText(inf.names || "-", { x: cx + 0.08, y, w: CAST_TABLE_COLS[4].w - 0.16, h, fontSize: 10.5, color: CAST_PAL.ink, valign: "middle", fontFace: "Meiryo", margin: 0 });
+  cx += CAST_TABLE_COLS[4].w;
+
+  const snsOpts = { x: cx + 0.08, y, w: CAST_TABLE_COLS[5].w - 0.16, h, fontSize: 10.5, color: "2E75B6", underline: true, valign: "middle", fontFace: "Meiryo", margin: 0 };
+  if (inf.url) snsOpts.hyperlink = { url: inf.url, tooltip: inf.account };
+  slide.addText(inf.url ? "Instagram" : "-", snsOpts);
+  cx += CAST_TABLE_COLS[5].w;
+
+  slide.addText(inf.area || "-", { x: cx + 0.08, y, w: CAST_TABLE_COLS[6].w - 0.16, h, fontSize: 10.5, color: CAST_PAL.sub, valign: "middle", fontFace: "Meiryo", margin: 0 });
+}
+
+function emitSpeciesTable(pptx, list, species) {
+  const perPage = 6, marginX = 0.5, topY = 1.05, rowH = 0.85;
+  const pages = Math.ceil(list.length / perPage);
+  for (let p = 0; p < pages; p++) {
+    const chunk = list.slice(p * perPage, (p + 1) * perPage);
+    const s = pptx.addSlide();
+    castTableTitleBar(pptx, s, species, p + 1);
+    castTableHeader(pptx, s, marginX, topY);
+    chunk.forEach((inf, idx) => castTableRow(pptx, s, inf, marginX, topY + 0.4 + idx * rowH, rowH));
+  }
+}
+
 function buildCastingDeck(data) {
   const pptx = new PptxGenJS();
   pptx.layout = "LAYOUT_WIDE";
@@ -611,6 +709,12 @@ function buildCastingDeck(data) {
   const cats = data.filter(d => d.category === "猫").sort(byFol);
 
   castCover(pptx, dogs.length, cats.length, data.length);
+
+  if (castStyle === "table") {
+    if (dogs.length) emitSpeciesTable(pptx, dogs, "犬");
+    if (cats.length) emitSpeciesTable(pptx, cats, "猫");
+    return pptx;
+  }
 
   const cols = 4, perPage = 8, marginX = 0.55, colGap = 0.3, rowGap = 0.2;
   const cW = (13.333 - marginX*2 - colGap*(cols-1)) / cols;
@@ -653,6 +757,7 @@ function setMode(m) {
     document.getElementById("lead").textContent = "キャスティングボードで書き出したCSVを貼り付けるだけで、犬・猫を色分けした提案スライド（PPTX）を作成します。";
     pptxBtn.textContent = "提案スライド（PPTX）を保存";
     csvBtn.style.display = "none";
+    document.getElementById("styleRow").classList.add("is-visible");
   } else {
     document.getElementById("inputTitle").textContent = "スタジオ情報を貼り付け";
     input.placeholder = "・スタジオ名：〇〇スタジオ\n・最寄り駅：〇〇駅（徒歩5分）\n・住所：東京都〇〇区...\n・広さ：50㎡\n・キッチンの有無：あり\n・控室の有無：あり\n・1時間あたりの料金：5,000円〜7,000円\n・ペット利用時の注意点：...\n・ペット可とした証憑：...\n・公式URL：https://...";
@@ -660,9 +765,16 @@ function setMode(m) {
     document.getElementById("lead").textContent = "スタジオ情報を貼り付けるだけで、提案スライド（PPTX）と Notion 取り込み用 CSV を作成します。";
     pptxBtn.textContent = "スライド（PPTX）を保存";
     csvBtn.style.display = "";
+    document.getElementById("styleRow").classList.remove("is-visible");
   }
 }
 document.querySelectorAll(".mode-btn").forEach(b => { b.onclick = () => setMode(b.dataset.mode); });
+document.querySelectorAll(".style-btn").forEach(b => {
+  b.onclick = () => {
+    castStyle = b.dataset.style;
+    document.querySelectorAll(".style-btn").forEach(x => x.classList.toggle("is-active", x === b));
+  };
+});
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
