@@ -511,16 +511,18 @@ function csvToRows(text) {
 }
 /* エイリアス方式：CSV/JSONの列名が多少変わっても拾えるようにする */
 const CAST_ALIASES = {
-  account:   ["account", "handle", "name", "アカウント", "アカウント名"],
+  account:   ["account", "handle", "name", "アカウント", "アカウント名", "instagram id", "instagramid", "インスタid", "インスタグラムid"],
   url:       ["url", "instagram", "link", "URL", "リンク"],
   followers: ["followers", "totalfollowers", "フォロワー数", "総フォロワー数"],
   breed:     ["breed", "犬種", "猫種", "犬種／猫種", "犬種・猫種", "品種"],
   names:     ["names", "petname", "ペット名", "名前"],
-  category:  ["category", "species", "カテゴリ", "種別"],
-  area:      ["area", "エリア", "地域"],
+  category:  ["category", "species", "カテゴリ", "種別", "種類"],
+  area:      ["area", "エリア", "地域", "居住地", "居住エリア"],
   age:       ["age", "年齢"],
   notes:     ["notes", "note", "備考", "メモ"]
 };
+// 既知の列名一覧（これに当てはまらない列は「追加カラム」として自動で表に載せる）
+const CAST_KNOWN_KEYS = Object.values(CAST_ALIASES).flat().map(k => k.toLowerCase());
 function castPick(o, keys) {
   for (const k of keys) {
     for (const objKey in o) {
@@ -539,7 +541,7 @@ function castNormCategory(raw) {
   return hasCat ? "猫" : "犬";
 }
 function normInf(o) {
-  return {
+  const base = {
     account: castPick(o, CAST_ALIASES.account).trim(),
     url: castPick(o, CAST_ALIASES.url).trim(),
     followers: Number(castPick(o, CAST_ALIASES.followers).replace(/[^0-9.]/g, "")) || 0,
@@ -548,8 +550,21 @@ function normInf(o) {
     category: castNormCategory(castPick(o, CAST_ALIASES.category)),
     area: castPick(o, CAST_ALIASES.area).trim(),
     age: castPick(o, CAST_ALIASES.age).trim(),
-    notes: castPick(o, CAST_ALIASES.notes).trim()
+    notes: castPick(o, CAST_ALIASES.notes).trim(),
+    // 元データに「種類/カテゴリ」列が実在したかどうか（無い案件では犬猫分けをしない）
+    _hasCategory: castPick(o, CAST_ALIASES.category).trim() !== ""
   };
+  // 既知のエイリアスに当てはまらない列は extras に保持（CSVの列順のまま）
+  const extras = {};
+  for (const key in o) {
+    const k = key.trim();
+    if (!k) continue;
+    if (CAST_KNOWN_KEYS.includes(k.toLowerCase())) continue;
+    const v = o[key] != null ? String(o[key]).trim() : "";
+    extras[k] = v;
+  }
+  base.extras = extras;
+  return base;
 }
 function parseCasting(text) {
   const t = (text || "").trim();
@@ -598,13 +613,27 @@ function renderInfluencers() {
       ? `<a href="${d.url}" target="_blank" rel="noopener">${d.account || "（名称なし）"}</a>`
       : (d.account || '<span class="miss">（名称なし）</span>');
     const note = summarizeNotes(d.notes);
+    // 追加カラム（既知エイリアス以外の列）もプレビューに表示
+    const extraRows = Object.entries(d.extras || {})
+      .filter(([k, v]) => v)
+      .map(([k, v]) => {
+        const lines = v.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        const urls = lines.filter(s => /^https?:\/\//i.test(s));
+        if (urls.length && urls.length === lines.length) {
+          const label = urls.length > 1 ? `リンク（${urls.length}件）` : "リンク";
+          return `<dt>${k}</dt><dd><a href="${urls[0]}" target="_blank" rel="noopener">${label}</a></dd>`;
+        }
+        return `<dt>${k}</dt><dd>${v}</dd>`;
+      }).join("");
     return `<div class="inf inf-${cls}">
-      <div class="name">${acc} <span class="badge">${d.category}</span></div>
+      <div class="name">${acc}${d._hasCategory ? ` <span class="badge">${d.category}</span>` : ""}</div>
       <dl>
-        <dt>${breedLabel}</dt><dd>${d.breed || '<span class="miss">（未記入）</span>'}</dd>
+        ${d.breed ? `<dt>${breedLabel}</dt><dd>${d.breed}</dd>` : ""}
+        ${d.names ? `<dt>名前</dt><dd>${d.names}</dd>` : ""}
         <dt>フォロワー</dt><dd>${fol}</dd>
-        ${d.area ? `<dt>エリア</dt><dd>${d.area}</dd>` : ""}
+        ${d.area ? `<dt>居住地</dt><dd>${d.area}</dd>` : ""}
         ${d.age ? `<dt>年齢</dt><dd>${d.age}</dd>` : ""}
+        ${extraRows}
         ${note.text ? `<dt>備考</dt><dd>${note.url ? `<a href="${note.url}" target="_blank" rel="noopener">${note.text}</a>` : note.text}</dd>` : ""}
       </dl>
     </div>`;
@@ -631,7 +660,7 @@ function castTitleBar(pptx, slide, species, pageInSpecies) {
   slide.addShape(pptx.ShapeType.rect, { x:0.45, y:0.34, w:0.1, h:0.44, fill:{color:c.hdr}, line:{color:c.hdr} });
   const ord = castCircle(pageInSpecies) + " フォロワー数順" + (pageInSpecies > 1 ? "（続き）" : "");
   slide.addText([
-    { text:`キャスティング候補（${species}）`, options:{ bold:true, color:CAST_PAL.ink, fontSize:20 } },
+    { text:"キャスティング候補" + (species ? `（${species}）` : ""), options:{ bold:true, color:CAST_PAL.ink, fontSize:20 } },
     { text:"　　" + ord, options:{ bold:false, color:CAST_PAL.sub, fontSize:13 } }
   ], { x:0.66, y:0.28, w:12, h:0.55, valign:"middle", fontFace:"Meiryo", margin:0 });
   slide.addText("© 2026  Peco", { x:0.45, y:7.12, w:4, h:0.3, fontSize:9, color:CAST_PAL.sub, valign:"middle", fontFace:"Meiryo", margin:0 });
@@ -644,7 +673,7 @@ function castCard(pptx, slide, inf, x, y, w, h, pageSpecies) {
   const c = castPal(pageSpecies);
   slide.addShape(pptx.ShapeType.roundRect, { x, y, w, h, rectRadius:0.07, fill:{color:c.body}, line:{color:c.border, width:1.25} });
   slide.addShape(pptx.ShapeType.rect, { x:x+0.06, y:y+0.06, w:w-0.12, h:0.34, fill:{color:c.hdr}, line:{color:c.hdr} });
-  slide.addText(`★ キャスティ PR 候補（${inf.category}）`, { x:x+0.06, y:y+0.06, w:w-0.12, h:0.34, fontSize:9, bold:true, color:CAST_PAL.white, align:"center", valign:"middle", fontFace:"Meiryo", margin:0 });
+  slide.addText("★ キャスティ PR 候補" + (inf._hasCategory ? `（${inf.category}）` : ""), { x:x+0.06, y:y+0.06, w:w-0.12, h:0.34, fontSize:9, bold:true, color:CAST_PAL.white, align:"center", valign:"middle", fontFace:"Meiryo", margin:0 });
   const pw = Math.min(1.75, w-0.7), ph = 1.28, px = x+(w-pw)/2, py = y+0.5;
   slide.addShape(pptx.ShapeType.rect, { x:px, y:py, w:pw, h:ph, fill:{color:"F2F2F2"}, line:{color:"D9D9D9", width:1} });
   slide.addText("写真", { x:px, y:py, w:pw, h:ph, fontSize:11, color:"B0B0B0", align:"center", valign:"middle", fontFace:"Meiryo", margin:0 });
@@ -657,14 +686,15 @@ function castCard(pptx, slide, inf, x, y, w, h, pageSpecies) {
   slide.addText(castFolText(inf.followers), { x:tx, y:y+2.60, w:tw, h:0.3, fontSize:13, bold:true, color: inf.followers > 0 ? c.accent : CAST_PAL.sub, valign:"middle", fontFace:"Meiryo", margin:0 });
 }
 
-function castCover(pptx, dogN, catN, total) {
+function castCover(pptx, dogN, catN, total, anyCategory) {
   const s = pptx.addSlide();
   s.background = { color: "FFFFFF" };
   s.addShape(pptx.ShapeType.roundRect, { x:0.85, y:0.85, w:2.7, h:0.42, rectRadius:0.06, fill:{color:"FDEEEA"}, line:{color:"FDEEEA"} });
   s.addText("候補リスト（裏取り前）", { x:0.85, y:0.85, w:2.7, h:0.42, fontSize:11, bold:true, color:"B85042", align:"center", valign:"middle", fontFace:"Meiryo", margin:0 });
   s.addShape(pptx.ShapeType.rect, { x:0.62, y:2.05, w:0.12, h:1.5, fill:{color:"B85042"}, line:{color:"B85042"} });
   s.addText("インフルエンサー\nキャスティング案", { x:0.95, y:2.0, w:11, h:1.65, fontSize:40, bold:true, color:"222222", lineSpacingMultiple:1.1, valign:"middle", fontFace:"Meiryo", margin:0 });
-  s.addText(`犬 ${dogN}名　／　猫 ${catN}名　　合計 ${total}名`, { x:0.97, y:3.95, w:11, h:0.4, fontSize:15, color:"B85042", fontFace:"Meiryo", valign:"middle", margin:0 });
+  const countText = anyCategory ? `犬 ${dogN}名　／　猫 ${catN}名　　合計 ${total}名` : `合計 ${total}名`;
+  s.addText(countText, { x:0.97, y:3.95, w:11, h:0.4, fontSize:15, color:"B85042", fontFace:"Meiryo", valign:"middle", margin:0 });
   s.addText("PECO Inc.　｜　Influencer Marketing Division", { x:0.97, y:4.5, w:11, h:0.35, fontSize:10, color:"888888", fontFace:"Meiryo", valign:"middle", margin:0 });
 }
 
@@ -674,19 +704,23 @@ function castCover(pptx, dogN, catN, total) {
 const CAST_TABLE_TOTAL_W = 12.333; // LAYOUT_WIDE(13.333in) から左右マージン0.5inずつを引いた幅
 
 function buildCastTableColumns(data) {
-  const hasAge = data.some(d => d.age);
-  const hasNotes = data.some(d => d.notes);
-  const hasArea = data.some(d => d.area);
+  const has = k => data.some(d => d[k]);
   const cols = [
-    { key: "account",   label: "アカウント",     flex: 3.0 },
-    { key: "followers", label: "総フォロワー数", flex: 1.5 },
-    { key: "breed",     label: "犬種／猫種",     flex: 1.7 }
+    { key: "account",   label: "アカウント",     flex: 2.8 },
+    { key: "followers", label: "総フォロワー数", flex: 1.4 }
   ];
-  if (hasAge) cols.push({ key: "age", label: "年齢", flex: 0.8 });
-  cols.push({ key: "names", label: "ペット名", flex: 1.7 });
-  if (hasArea) cols.push({ key: "area", label: "エリア", flex: 1.0 });
-  cols.push({ key: "sns", label: "主な活動SNS", flex: 1.5 });
-  if (hasNotes) cols.push({ key: "notes", label: "備考", flex: 1.8 });
+  if (has("breed")) cols.push({ key: "breed", label: "犬種／猫種", flex: 1.6 });
+  if (has("age"))   cols.push({ key: "age",   label: "年齢",       flex: 0.8 });
+  if (has("names")) cols.push({ key: "names", label: "名前",       flex: 1.5 });
+  if (has("area"))  cols.push({ key: "area",  label: "居住地",     flex: 1.0 });
+  // 追加カラム：既知のエイリアスに無い列は、CSVの列順のまま自動で表に載せる
+  const extraLabels = [];
+  data.forEach(d => Object.keys(d.extras || {}).forEach(k => {
+    if (!extraLabels.includes(k) && data.some(x => ((x.extras || {})[k] || "") !== "")) extraLabels.push(k);
+  }));
+  extraLabels.forEach(label => cols.push({ key: "extra:" + label, label, flex: 1.6, extra: label }));
+  cols.push({ key: "sns", label: "主な活動SNS", flex: 1.2 });
+  if (has("notes")) cols.push({ key: "notes", label: "備考", flex: 1.7 });
   const totalFlex = cols.reduce((s, c) => s + c.flex, 0);
   cols.forEach(c => { c.w = c.flex / totalFlex * CAST_TABLE_TOTAL_W; });
   return cols;
@@ -696,7 +730,7 @@ function castTableTitleBar(pptx, slide, species, pageInSpecies) {
   const c = castPal(species);
   slide.background = { color: "FFFFFF" };
   const ord = castCircle(pageInSpecies) + " フォロワー数順" + (pageInSpecies > 1 ? "（続き）" : "");
-  slide.addText(`インフルエンサーリスト（${species}）`,
+  slide.addText("インフルエンサーリスト" + (species ? `（${species}）` : ""),
     { x: 0.5, y: 0.3, w: 9, h: 0.5, fontSize: 26, bold: true, color: CAST_PAL.ink, valign: "middle", fontFace: "Meiryo", margin: 0 });
   slide.addText(ord,
     { x: 9.6, y: 0.4, w: 3.233, h: 0.4, fontSize: 11, color: CAST_PAL.sub, align: "right", valign: "middle", fontFace: "Meiryo", margin: 0 });
@@ -745,6 +779,16 @@ function castTableRow(pptx, slide, inf, x, y, h, cols, pageSpecies) {
       const snsOpts = { x: cx + 0.08, y, w: colW - 0.16, h, fontSize: 10.5, color: "2E75B6", underline: true, valign: "middle", fontFace: "Meiryo", margin: 0 };
       if (inf.url) snsOpts.hyperlink = { url: inf.url, tooltip: inf.account };
       slide.addText(inf.url ? "Instagram" : "-", snsOpts);
+    } else if (col.extra) {
+      // 追加カラム：URLのみのセルは「リンク」表記（複数行は件数表示・先頭URLへリンク）
+      const v = ((inf.extras || {})[col.extra] || "").trim();
+      const exLines = v.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      const exUrls = exLines.filter(s => /^https?:\/\//i.test(s));
+      const isUrl = exUrls.length > 0 && exUrls.length === exLines.length;
+      const exText = isUrl ? (exUrls.length > 1 ? `リンク（${exUrls.length}件）` : "リンク") : (v || "-");
+      const exOpts = { x: cx + 0.08, y, w: colW - 0.16, h, fontSize: 9.5, color: isUrl ? "2E75B6" : CAST_PAL.ink, underline: isUrl, valign: "middle", fontFace: "Meiryo", margin: 0 };
+      if (isUrl) exOpts.hyperlink = { url: exUrls[0], tooltip: col.extra };
+      slide.addText(exText, exOpts);
     } else if (col.key === "notes") {
       const note = summarizeNotes(inf.notes);
       const noteOpts = { x: cx + 0.08, y, w: colW - 0.16, h, fontSize: 9.5, color: note.url ? "2E75B6" : CAST_PAL.sub, underline: !!note.url, valign: "middle", fontFace: "Meiryo", margin: 0 };
@@ -773,15 +817,18 @@ function buildCastingDeck(data) {
   pptx.title = "インフルエンサー キャスティング案";
 
   const byFol = (a, b) => (Number(b.followers)||0) - (Number(a.followers)||0);
+  // 元データに「種類/カテゴリ」列があるかどうか。無い案件（家電・楽天ルーム等）は犬猫分けをしない
+  const anyCategory = data.some(d => d._hasCategory);
   // 「犬・猫」両方の項目を持つアカウントは犬・猫どちらのページにも掲載する
   const dogs = data.filter(d => d.category !== "猫").sort(byFol);
   const cats = data.filter(d => d.category === "猫" || d.category === "犬・猫").sort(byFol);
+  const dogLabel = anyCategory ? "犬" : "";   // 種類列が無ければ見出しの（犬）を省略
 
-  castCover(pptx, dogs.length, cats.length, data.length);
+  castCover(pptx, dogs.length, cats.length, data.length, anyCategory);
 
   if (castStyle === "table") {
     const tableCols = buildCastTableColumns(data);
-    if (dogs.length) emitSpeciesTable(pptx, dogs, "犬", tableCols);
+    if (dogs.length) emitSpeciesTable(pptx, dogs, dogLabel, tableCols);
     if (cats.length) emitSpeciesTable(pptx, cats, "猫", tableCols);
     return pptx;
   }
@@ -802,7 +849,7 @@ function buildCastingDeck(data) {
       });
     }
   }
-  if (dogs.length) emitSpecies(dogs, "犬");
+  if (dogs.length) emitSpecies(dogs, dogLabel);
   if (cats.length) emitSpecies(cats, "猫");
   return pptx;
 }
@@ -822,7 +869,7 @@ function setMode(m) {
   if (m === "casting") {
     document.getElementById("inputTitle").textContent = "キャスティングCSVを貼り付け";
     input.placeholder = "キャスティングボードから書き出したCSVを貼り付け\n（1行目: account,url,followers,breed,names,category,area,age）";
-    document.getElementById("inputHint").innerHTML = 'キャスティングボードの「CSVで書き出し」または「JSONで書き出し」の中身をそのまま貼ってください。写真は出力後に各カードの枠へ手動で入れます。';
+    document.getElementById("inputHint").innerHTML = 'キャスティングボードの「CSVで書き出し」または「JSONで書き出し」の中身をそのまま貼ってください。<b>基本の列（アカウント名・URL・フォロワー数など）以外の列（例：楽天ルームの利用、ペット家電利用状況）も自動で表のカラムになります。</b>写真は出力後に各カードの枠へ手動で入れます。';
     document.getElementById("lead").textContent = "キャスティングボードで書き出したCSVを貼り付けるだけで、犬・猫を色分けした提案スライド（PPTX）を作成します。";
     pptxBtn.textContent = "提案スライド（PPTX）を保存";
     csvBtn.style.display = "none";
