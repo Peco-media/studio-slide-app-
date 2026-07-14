@@ -816,7 +816,20 @@ function buildCastingDeck(data) {
   pptx.layout = "LAYOUT_WIDE";
   pptx.title = "インフルエンサー キャスティング案";
 
-  const byFol = (a, b) => (Number(b.followers)||0) - (Number(a.followers)||0);
+  // 優先度マーク（例：「775向けかどうかの判断基準」列に「◯」）があるアカウントを先頭に、
+  // その中でフォロワー数の多い順。マーク列が無い/全て空欄の通常案件では、
+  // 全員が同じグループになるため実質フォロワー数だけの並び替えと同じ動きになる。
+  const PRIORITY_MARK_KEYS = ["優先", "優先度", "775向けかどうかの判断基準"];
+  const hasPriorityMark = (d) => PRIORITY_MARK_KEYS.some(k => {
+    const v = d[k] ?? (d.extras ? d.extras[k] : undefined);
+    return typeof v === "string" && v.trim() === "◯";
+  });
+  const byFol = (a, b) => {
+    const aMark = hasPriorityMark(a) ? 0 : 1;
+    const bMark = hasPriorityMark(b) ? 0 : 1;
+    if (aMark !== bMark) return aMark - bMark;
+    return (Number(b.followers)||0) - (Number(a.followers)||0);
+  };
   // 元データに「種類/カテゴリ」列があるかどうか。無い案件（家電・楽天ルーム等）は犬猫分けをしない
   const anyCategory = data.some(d => d._hasCategory);
   // 「犬・猫」両方の項目を持つアカウントは犬・猫どちらのページにも掲載する
